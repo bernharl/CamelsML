@@ -19,20 +19,52 @@ from numba import njit
 
 # CAMELS catchment characteristics ignored in this study
 INVALID_ATTR = [
-    'gauge_name', 'area_geospa_fabric', 'geol_1st_class', 'glim_1st_class_frac', 'geol_2nd_class',
-    'glim_2nd_class_frac', 'dom_land_cover_frac', 'dom_land_cover', 'high_prec_timing',
-    'low_prec_timing', 'huc', 'q_mean', 'runoff_ratio', 'stream_elas', 'slope_fdc',
-    'baseflow_index', 'hfd_mean', 'q5', 'q95', 'high_q_freq', 'high_q_dur', 'low_q_freq',
-    'low_q_dur', 'zero_q_freq', 'geol_porostiy', 'root_depth_50', 'root_depth_99', 'organic_frac',
-    'water_frac', 'other_frac'
+    "gauge_name",
+    "area_geospa_fabric",
+    "geol_1st_class",
+    "glim_1st_class_frac",
+    "geol_2nd_class",
+    "glim_2nd_class_frac",
+    "dom_land_cover_frac",
+    "dom_land_cover",
+    "high_prec_timing",
+    "low_prec_timing",
+    "huc",
+    "q_mean",
+    "runoff_ratio",
+    "stream_elas",
+    "slope_fdc",
+    "baseflow_index",
+    "hfd_mean",
+    "q5",
+    "q95",
+    "high_q_freq",
+    "high_q_dur",
+    "low_q_freq",
+    "low_q_dur",
+    "zero_q_freq",
+    "geol_porostiy",
+    "root_depth_50",
+    "root_depth_99",
+    "organic_frac",
+    "water_frac",
+    "other_frac",
+    # Added for GB
+    "flow_period_start",
+    "flow_period_end",
+    "quncert_meta"
 ]
 
 # Maurer mean/std calculated over all basins in period 01.10.1999 until 30.09.2008
 SCALER = {
-    'input_means': np.array([3.17563234, 372.01003929, 17.31934062, 3.97393362, 924.98004197]),
-    'input_stds': np.array([6.94344737, 131.63560881, 10.86689718, 10.3940032, 629.44576432]),
-    'output_mean': np.array([1.49996196]),
-    'output_std': np.array([3.62443672])
+    "input_means": np.array(
+        [3.17563234, 372.01003929, 17.31934062, 3.97393362, 924.98004197]
+    ),
+    "input_stds": np.array(
+        [6.94344737, 131.63560881, 10.86689718, 10.3940032, 629.44576432]
+    ),
+    "output_mean": np.array([1.49996196]),
+    "output_std": np.array([3.62443672]),
 }
 
 
@@ -52,18 +84,18 @@ def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
     RuntimeError
         If CAMELS attributes folder could not be found.
     """
-    attributes_path = Path(camels_root) / 'camels_attributes_v2.0'
+    attributes_path = Path(camels_root) / "camels_attributes_v2.0"
 
     if not attributes_path.exists():
         raise RuntimeError(f"Attribute folder not found at {attributes_path}")
 
-    txt_files = attributes_path.glob('camels_*.txt')
+    txt_files = attributes_path.glob("camels_*.txt")
 
     # Read-in attributes into one big dataframe
     df = None
     for f in txt_files:
-        df_temp = pd.read_csv(f, sep=';', header=0, dtype={'gauge_id': str})
-        df_temp = df_temp.set_index('gauge_id')
+        df_temp = pd.read_csv(f, sep=";", header=0, dtype={"gauge_id": str})
+        df_temp = df_temp.set_index("gauge_id")
 
         if df is None:
             df = df_temp.copy()
@@ -71,23 +103,78 @@ def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
             df = pd.concat([df, df_temp], axis=1)
 
     # convert huc column to double digit strings
-    df['huc'] = df['huc_02'].apply(lambda x: str(x).zfill(2))
-    df = df.drop('huc_02', axis=1)
-
+    df["huc"] = df["huc_02"].apply(lambda x: str(x).zfill(2))
+    df = df.drop("huc_02", axis=1)
+    #tmp to check
+    return df
     if db_path is None:
-        db_path = str(Path(__file__).absolute().parent.parent / 'data' / 'attributes.db')
+        db_path = str(
+            Path(__file__).absolute().parent.parent / "data" / "attributes.db"
+        )
 
     with sqlite3.connect(db_path) as conn:
         # insert into databse
-        df.to_sql('basin_attributes', conn)
+        df.to_sql("basin_attributes", conn)
 
     print(f"Sucessfully stored basin attributes in {db_path}.")
 
+def add_camels_gb_attributes(camels_root: PosixPath, db_path: str = None):
+    """Load catchment characteristics from txt files and store them in a sqlite3 table
+    
+    Parameters
+    ----------
+    camels_root : PosixPath
+        Path to the main directory of the CAMELS data set
+    db_path : str, optional
+        Path to where the database file should be saved. If None, stores the database in the 
+        `data` directory in the main folder of this repository., by default None
+    
+    Raises
+    ------
+    RuntimeError
+        If CAMELS attributes folder could not be found.
+    """
+    attributes_path = Path(camels_root) / "catalogue.ceh.ac.uk/datastore/eidchub/8344e4f3-d2ea-44f5-8afa-86d2987543a9/" 
 
-def load_attributes(db_path: str,
-                    basins: List,
-                    drop_lat_lon: bool = True,
-                    keep_features: List = None) -> pd.DataFrame:
+    if not attributes_path.exists():
+        raise RuntimeError(f"Attribute folder not found at {attributes_path}")
+
+    txt_files = attributes_path.glob("CAMELS_GB_*.csv")
+
+    # Read-in attributes into one big dataframe
+    df = None
+    for f in txt_files:
+        df_temp = pd.read_csv(f)
+        if df is None:
+            df = df_temp.copy()
+        else:
+            df = pd.concat([df, df_temp], axis=1)
+        #df_temp = pd.read_csv(f, sep=";", header=0, dtype={"gauge_id": str})
+        #df_temp = df_temp.set_index("gauge_id")
+
+        #if df is None:
+        #    df = df_temp.copy()
+        #else:
+        #    df = pd.concat([df, df_temp], axis=1)
+    df = df.loc[:,~df.columns.duplicated()]
+    df.set_index("gauge_id", inplace=True)
+    # tmp to check
+    df = df.dropna(axis=1)
+    # convert huc column to double digit strings
+    if db_path is None:
+        db_path = str(
+            Path(__file__).absolute().parent.parent / "data" / "attributes.db"
+        )
+
+    with sqlite3.connect(db_path) as conn:
+        # insert into databse
+        df.to_sql("basin_attributes", conn)
+
+    print(f"Sucessfully stored basin attributes in {db_path}.")
+
+def load_attributes(
+    db_path: str, basins: List[str], drop_lat_lon: bool = True, keep_features: List = None
+) -> pd.DataFrame:
     """Load attributes from database file into DataFrame
 
     Parameters
@@ -109,15 +196,14 @@ def load_attributes(db_path: str,
         transformed to x, y, z on a unit sphere.
     """
     with sqlite3.connect(db_path) as conn:
-        df = pd.read_sql("SELECT * FROM 'basin_attributes'", conn, index_col='gauge_id')
-
+        df = pd.read_sql("SELECT * FROM 'basin_attributes'", conn, index_col="gauge_id")
     # drop rows of basins not contained in data set
-    drop_basins = [b for b in df.index if b not in basins]
+    drop_basins = [b for b in df.index if str(b) not in basins]
     df = df.drop(drop_basins, axis=0)
 
     # drop lat/lon col
     if drop_lat_lon:
-        df = df.drop(['gauge_lat', 'gauge_lon'], axis=1)
+        df = df.drop(["gauge_lat", "gauge_lon"], axis=1)
 
     # drop invalid attributes
     if keep_features is not None:
@@ -152,10 +238,11 @@ def normalize_features(feature: np.ndarray, variable: str) -> np.ndarray:
     RuntimeError
         If `variable` is neither 'inputs' nor 'output'
     """
-
-    if variable == 'inputs':
+    # Temp before actually fixing scaling.
+    return feature 
+    if variable == "inputs":
         feature = (feature - SCALER["input_means"]) / SCALER["input_stds"]
-    elif variable == 'output':
+    elif variable == "output":
         feature = (feature - SCALER["output_mean"]) / SCALER["output_std"]
     else:
         raise RuntimeError(f"Unknown variable type {variable}")
@@ -185,9 +272,11 @@ def rescale_features(feature: np.ndarray, variable: str) -> np.ndarray:
     RuntimeError
         If `variable` is neither 'inputs' nor 'output'
     """
-    if variable == 'inputs':
+    # Temp as well
+    return feature 
+    if variable == "inputs":
         feature = feature * SCALER["input_stds"] + SCALER["input_means"]
-    elif variable == 'output':
+    elif variable == "output":
         feature = feature * SCALER["output_std"] + SCALER["output_mean"]
     else:
         raise RuntimeError(f"Unknown variable type {variable}")
@@ -196,7 +285,9 @@ def rescale_features(feature: np.ndarray, variable: str) -> np.ndarray:
 
 
 @njit
-def reshape_data(x: np.ndarray, y: np.ndarray, seq_length: int) -> Tuple[np.ndarray, np.ndarray]:
+def reshape_data(
+    x: np.ndarray, y: np.ndarray, seq_length: int
+) -> Tuple[np.ndarray, np.ndarray]:
     """Reshape data into LSTM many-to-one input samples
 
     Parameters
@@ -223,90 +314,81 @@ def reshape_data(x: np.ndarray, y: np.ndarray, seq_length: int) -> Tuple[np.ndar
     y_new = np.zeros((num_samples - seq_length + 1, 1))
 
     for i in range(0, x_new.shape[0]):
-        x_new[i, :, :num_features] = x[i:i + seq_length, :]
+        x_new[i, :, :num_features] = x[i : i + seq_length, :]
         y_new[i, :] = y[i + seq_length - 1, 0]
 
     return x_new, y_new
 
 
-def load_forcing(camels_root: PosixPath, basin: str) -> Tuple[pd.DataFrame, int]:
-    """Load Maurer forcing data from text files.
+def load_forcing(
+    basin: str, camels_root: Path, features: List[str]
+) -> Tuple[pd.DataFrame, int]:
+    """Load the meteorological forcing data of a specific basin.
 
-    Parameters
-    ----------
-    camels_root : PosixPath
-        Path to the main directory of the CAMELS data set
-    basin : str
-        8-digit USGS gauge id
+    :param basin: 8-digit code of basin as string.
 
-    Returns
-    -------
-    df : pd.DataFrame
-        DataFrame containing the Maurer forcing
-    area: int
-        Catchment area (read-out from the header of the forcing file)
-
-    Raises
-    ------
-    RuntimeError
-        If not forcing file was found.
+    :return: pd.DataFrame containing the meteorological forcing data and the
+        area of the basin as integer.
     """
-    forcing_path = camels_root / 'basin_mean_forcing' / 'maurer_extended'
-    files = list(forcing_path.glob('**/*_forcing_leap.txt'))
-    file_path = [f for f in files if f.name[:8] == basin]
-    if len(file_path) == 0:
-        raise RuntimeError(f'No file for Basin {basin} at {file_path}')
-    else:
-        file_path = file_path[0]
+    path = (
+        camels_root
+        / "timeseries"
+        / f"CAMELS_GB_hydromet_timeseries_{basin}_19701001-20150930.csv"
+    )
+    exclude = ["pet", "discharge_vol", "discharge_spec"]
+    df = pd.read_csv(path).dropna()
+    columns = df.columns.values
+    for feature in columns:
+        if feature not in features and feature != "date":
+            exclude.append(feature)
+    df = df.drop(exclude, axis=1)
+    dates = pd.to_datetime(df["date"])
+    year = []
+    day = []
+    month = []
+    hour = np.ones(len(dates)) * 12
+    for date in df["date"]:
+        date_split = date.split("-")
+        year.append(int(date_split[0]))
+        month.append(int(date_split[1]))
+        day.append(int(date_split[2]))
+    df["Year"] = np.array(year)
+    df["Mnth"] = np.array(month)
+    df["Day"] = np.array(day)
+    df["Hr"] = hour
+    df["Date"] = dates
+    df.drop("date", axis=1, inplace=True)
+    df.set_index("Date", inplace=True)
+    return df, 1
 
-    df = pd.read_csv(file_path, sep='\s+', header=3)
-    dates = (df.Year.map(str) + "/" + df.Mnth.map(str) + "/" + df.Day.map(str))
-    df.index = pd.to_datetime(dates, format="%Y/%m/%d")
 
-    # load area from header
-    with open(file_path, 'r') as fp:
-        content = fp.readlines()
-        area = int(content[2])
+def load_discharge(
+    basin: str, camels_root: Path, area: int, dates: pd.Series
+) -> pd.Series:
+    """Load the discharge time series for a specific basin.
 
-    return df, area
+    :param basin: 8-digit code of basin as string.
+    :param area: int, area of the catchment in square meters
 
-
-def load_discharge(camels_root: PosixPath, basin: str, area: int) -> pd.Series:
-    """[summary]
-
-    Parameters
-    ----------
-    camels_root : PosixPath
-        Path to the main directory of the CAMELS data set
-    basin : str
-        8-digit USGS gauge id
-    area : int
-        Catchment area, used to normalize the discharge to mm/day
-
-    Returns
-    -------
-    pd.Series
-        A Series containing the discharge values.
-
-    Raises
-    ------
-    RuntimeError
-        If no discharge file was found.
+    :return: A pd.Series containng the catchment normalized discharge.
     """
-    discharge_path = camels_root / 'usgs_streamflow'
-    files = list(discharge_path.glob('**/*_streamflow_qc.txt'))
-    file_path = [f for f in files if f.name[:8] == basin]
-    if len(file_path) == 0:
-        raise RuntimeError(f'No file for Basin {basin} at {file_path}')
-    else:
-        file_path = file_path[0]
 
-    col_names = ['basin', 'Year', 'Mnth', 'Day', 'QObs', 'flag']
-    df = pd.read_csv(file_path, sep='\s+', header=None, names=col_names)
-    dates = (df.Year.map(str) + "/" + df.Mnth.map(str) + "/" + df.Day.map(str))
-    df.index = pd.to_datetime(dates, format="%Y/%m/%d")
+    discharge_path = (
+        camels_root
+        / "timeseries"
+        / f"CAMELS_GB_hydromet_timeseries_{basin}_19701001-20150930.csv"
+    )
+    df = pd.read_csv(discharge_path)
+    df["date"] = pd.to_datetime(df["date"])
+    df.set_index("date", inplace=True)
+    df = df["discharge_spec"]
+    df.fillna(0, inplace=True)
+    df = pd.to_numeric(df)
+    df = df[dates[0] : dates[-1]]
+    return df
 
-    # normalize discharge from cubic feed per second to mm per day
-    df.QObs = 28316846.592 * df.QObs * 86400 / (area * 10**6)
 
-    return df.QObs
+if __name__ == "__main__":
+    #add_camels_attributes(camels_root="/home/bernhard/git/datasets_masters/camels_us/basin_dataset_public_v1p2", db_path="camels_us")
+    add_camels_gb_attributes(camels_root="/home/bernhard/git/datasets_masters/camels_gb", db_path="converted_gb/attributes.db")
+    #print(load_attributes(db_path="camels_us", basins=["01013500"]))
