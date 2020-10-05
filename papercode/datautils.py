@@ -52,7 +52,7 @@ INVALID_ATTR = [
     # Added for GB
     "flow_period_start",
     "flow_period_end",
-    "quncert_meta"
+    "quncert_meta",
 ]
 
 # Maurer mean/std calculated over all basins in period 01.10.1999 until 30.09.2008
@@ -68,17 +68,17 @@ SCALER = {
 }
 
 
-def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
+def add_camels_us_attributes(camels_root: PosixPath, db_path: str = None):
     """Load catchment characteristics from txt files and store them in a sqlite3 table
-    
+
     Parameters
     ----------
     camels_root : PosixPath
         Path to the main directory of the CAMELS data set
     db_path : str, optional
-        Path to where the database file should be saved. If None, stores the database in the 
+        Path to where the database file should be saved. If None, stores the database in the
         `data` directory in the main folder of this repository., by default None
-    
+
     Raises
     ------
     RuntimeError
@@ -105,7 +105,7 @@ def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
     # convert huc column to double digit strings
     df["huc"] = df["huc_02"].apply(lambda x: str(x).zfill(2))
     df = df.drop("huc_02", axis=1)
-    #tmp to check
+    # tmp to check
     return df
     if db_path is None:
         db_path = str(
@@ -118,23 +118,27 @@ def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
 
     print(f"Sucessfully stored basin attributes in {db_path}.")
 
-def add_camels_gb_attributes(camels_root: PosixPath, db_path: str = None):
+
+def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
     """Load catchment characteristics from txt files and store them in a sqlite3 table
-    
+
     Parameters
     ----------
     camels_root : PosixPath
         Path to the main directory of the CAMELS data set
     db_path : str, optional
-        Path to where the database file should be saved. If None, stores the database in the 
+        Path to where the database file should be saved. If None, stores the database in the
         `data` directory in the main folder of this repository., by default None
-    
+
     Raises
     ------
     RuntimeError
         If CAMELS attributes folder could not be found.
     """
-    attributes_path = Path(camels_root) / "catalogue.ceh.ac.uk/datastore/eidchub/8344e4f3-d2ea-44f5-8afa-86d2987543a9/" 
+    attributes_path = (
+        Path(camels_root)
+        / "catalogue.ceh.ac.uk/datastore/eidchub/8344e4f3-d2ea-44f5-8afa-86d2987543a9/"
+    )
 
     if not attributes_path.exists():
         raise RuntimeError(f"Attribute folder not found at {attributes_path}")
@@ -149,14 +153,15 @@ def add_camels_gb_attributes(camels_root: PosixPath, db_path: str = None):
             df = df_temp.copy()
         else:
             df = pd.concat([df, df_temp], axis=1)
-        #df_temp = pd.read_csv(f, sep=";", header=0, dtype={"gauge_id": str})
-        #df_temp = df_temp.set_index("gauge_id")
+        # df_temp = pd.read_csv(f, sep=";", header=0, dtype={"gauge_id": str})
+        # df_temp = df_temp.set_index("gauge_id")
 
-        #if df is None:
+        # if df is None:
         #    df = df_temp.copy()
-        #else:
+        # else:
         #    df = pd.concat([df, df_temp], axis=1)
-    df = df.loc[:,~df.columns.duplicated()]
+    df = df.loc[:, ~df.columns.duplicated()]
+    np.savetxt("data/basin_list.txt", df["gauge_id"].values, fmt="%s")
     df.set_index("gauge_id", inplace=True)
     # tmp to check
     df = df.dropna(axis=1)
@@ -172,8 +177,12 @@ def add_camels_gb_attributes(camels_root: PosixPath, db_path: str = None):
 
     print(f"Sucessfully stored basin attributes in {db_path}.")
 
+
 def load_attributes(
-    db_path: str, basins: List[str], drop_lat_lon: bool = True, keep_features: List = None
+    db_path: str,
+    basins: List[str],
+    drop_lat_lon: bool = True,
+    keep_features: List = None,
 ) -> pd.DataFrame:
     """Load attributes from database file into DataFrame
 
@@ -199,6 +208,7 @@ def load_attributes(
         df = pd.read_sql("SELECT * FROM 'basin_attributes'", conn, index_col="gauge_id")
     # drop rows of basins not contained in data set
     drop_basins = [b for b in df.index if str(b) not in basins]
+    # return drop_basins, df
     df = df.drop(drop_basins, axis=0)
 
     # drop lat/lon col
@@ -239,7 +249,7 @@ def normalize_features(feature: np.ndarray, variable: str) -> np.ndarray:
         If `variable` is neither 'inputs' nor 'output'
     """
     # Temp before actually fixing scaling.
-    return feature 
+    return feature
     if variable == "inputs":
         feature = (feature - SCALER["input_means"]) / SCALER["input_stds"]
     elif variable == "output":
@@ -273,7 +283,7 @@ def rescale_features(feature: np.ndarray, variable: str) -> np.ndarray:
         If `variable` is neither 'inputs' nor 'output'
     """
     # Temp as well
-    return feature 
+    return feature
     if variable == "inputs":
         feature = feature * SCALER["input_stds"] + SCALER["input_means"]
     elif variable == "output":
@@ -302,7 +312,7 @@ def reshape_data(
     Returns
     -------
     x_new: np.ndarray
-        Reshaped input features of shape [num_samples*, seq_length, num_features], where 
+        Reshaped input features of shape [num_samples*, seq_length, num_features], where
         num_samples* is equal to num_samples - seq_length + 1, due to the need of a warm start at
         the beginning
     y_new: np.ndarray
@@ -320,9 +330,7 @@ def reshape_data(
     return x_new, y_new
 
 
-def load_forcing(
-    basin: str, camels_root: Path, features: List[str]
-) -> Tuple[pd.DataFrame, int]:
+def load_forcing(camels_root: Path, basin: str) -> Tuple[pd.DataFrame, int]:
     """Load the meteorological forcing data of a specific basin.
 
     :param basin: 8-digit code of basin as string.
@@ -330,17 +338,22 @@ def load_forcing(
     :return: pd.DataFrame containing the meteorological forcing data and the
         area of the basin as integer.
     """
+    if isinstance(camels_root, str):
+        camels_root = Path(camels_root)
+    elif not isinstance(camels_root, Path):
+        raise ValueError(f"camels_root must be Path or str, not {type(camels_root)}")
     path = (
         camels_root
+        / "catalogue.ceh.ac.uk"
+        / "datastore"
+        / "eidchub"
+        / "8344e4f3-d2ea-44f5-8afa-86d2987543a9"
         / "timeseries"
         / f"CAMELS_GB_hydromet_timeseries_{basin}_19701001-20150930.csv"
     )
-    exclude = ["pet", "discharge_vol", "discharge_spec"]
+    exclude = ["pet", "discharge_vol", "discharge_spec", "peti"]
     df = pd.read_csv(path).dropna()
     columns = df.columns.values
-    for feature in columns:
-        if feature not in features and feature != "date":
-            exclude.append(feature)
     df = df.drop(exclude, axis=1)
     dates = pd.to_datetime(df["date"])
     year = []
@@ -362,9 +375,7 @@ def load_forcing(
     return df, 1
 
 
-def load_discharge(
-    basin: str, camels_root: Path, area: int, dates: pd.Series
-) -> pd.Series:
+def load_discharge(camels_root: Path, basin: str, area: int) -> pd.Series:
     """Load the discharge time series for a specific basin.
 
     :param basin: 8-digit code of basin as string.
@@ -372,9 +383,16 @@ def load_discharge(
 
     :return: A pd.Series containng the catchment normalized discharge.
     """
-
+    if isinstance(camels_root, str):
+        camels_root = Path(camels_root)
+    elif not isinstance(camels_root, Path):
+        raise ValueError(f"camels_root must be Path or str, not {type(camels_root)}")
     discharge_path = (
         camels_root
+        / "catalogue.ceh.ac.uk"
+        / "datastore"
+        / "eidchub"
+        / "8344e4f3-d2ea-44f5-8afa-86d2987543a9"
         / "timeseries"
         / f"CAMELS_GB_hydromet_timeseries_{basin}_19701001-20150930.csv"
     )
@@ -384,11 +402,14 @@ def load_discharge(
     df = df["discharge_spec"]
     df.fillna(0, inplace=True)
     df = pd.to_numeric(df)
-    df = df[dates[0] : dates[-1]]
+    # df = df[dates[0] : dates[-1]]
     return df
 
 
 if __name__ == "__main__":
-    #add_camels_attributes(camels_root="/home/bernhard/git/datasets_masters/camels_us/basin_dataset_public_v1p2", db_path="camels_us")
-    add_camels_gb_attributes(camels_root="/home/bernhard/git/datasets_masters/camels_gb", db_path="converted_gb/attributes.db")
-    #print(load_attributes(db_path="camels_us", basins=["01013500"]))
+    # add_camels_attributes(camels_root="/home/bernhard/git/datasets_masters/camels_us/basin_dataset_public_v1p2", db_path="camels_us")
+    add_camels_gb_attributes(
+        camels_root="/home/bernhard/git/datasets_masters/camels_gb",
+        db_path="converted_gb/attributes.db",
+    )
+    # print(load_attributes(db_path="camels_us", basins=["01013500"]))

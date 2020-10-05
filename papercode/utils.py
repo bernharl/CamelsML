@@ -54,8 +54,8 @@ def create_h5_files(camels_root: PosixPath,
 
     with h5py.File(out_file, 'w') as out_f:
         input_data = out_f.create_dataset('input_data',
-                                          shape=(0, seq_length, 5),
-                                          maxshape=(None, seq_length, 5),
+                                          shape=(0, seq_length, 6),
+                                          maxshape=(None, seq_length, 6),
                                           chunks=True,
                                           dtype=np.float32,
                                           compression='gzip')
@@ -80,7 +80,6 @@ def create_h5_files(camels_root: PosixPath,
                                                   dtype="S10",
                                                   compression='gzip',
                                                   chunks=True)
-
         for basin in tqdm(basins, file=sys.stdout):
 
             dataset = CamelsTXT(camels_root=camels_root,
@@ -93,7 +92,7 @@ def create_h5_files(camels_root: PosixPath,
             total_samples = input_data.shape[0] + num_samples
 
             # store input and output samples
-            input_data.resize((total_samples, seq_length, 5))
+            input_data.resize((total_samples, seq_length, 6))
             target_data.resize((total_samples, 1))
             input_data[-num_samples:, :, :] = dataset.x
             target_data[-num_samples:, :] = dataset.y
@@ -119,8 +118,6 @@ def get_basin_list() -> List:
     List
         List containing the 8-digit basin code of all basins
     """
-    basin_file = Path(__file__).absolute().parent.parent / "data/basin_list.txt"
-    with basin_file.open('r') as fp:
-        basins = fp.readlines()
-    basins = [basin.strip() for basin in basins]
+    basins = np.genfromtxt("data/basin_list.txt", dtype=str)
+    basins = np.delete(basins, np.argwhere(basins in ["18017", "18018"]))
     return basins

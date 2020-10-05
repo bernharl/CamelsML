@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 from .datautils import (
     load_attributes,
@@ -120,7 +121,14 @@ class CamelsTXT(Dataset):
         df = df[start_date:end_date]
 
         # store first and last date of the selected period (including warm_start)
-        self.period_start = df.index[0]
+        try:
+            self.period_start = df.index[0]
+        except IndexError:
+            print(start_date, end_date)
+            print(df)
+            print(df.index)
+            print(self.basin)
+            exit()
         self.period_end = df.index[-1]
 
         # use all meteorological variables as inputs
@@ -131,11 +139,11 @@ class CamelsTXT(Dataset):
                 df["humidity"].values,
                 df["shortwave_rad"].values,
                 df["longwave_rad"].values,
-                df["windspeed"].values].values,
+                df["windspeed"].values,
             ]
         ).T
 
-        y = np.array([df["discharge_spec"].values]).T
+        y = np.array([df["QObs(mm/d)"].values]).T
 
         # normalize data, reshape for LSTM training and remove invalid samples
         x = normalize_features(x, variable="inputs")
