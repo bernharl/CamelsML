@@ -21,14 +21,16 @@ from tqdm import tqdm
 from .datasets import CamelsTXT
 
 
-def create_h5_files(camels_root: PosixPath,
-                    out_file: PosixPath,
-                    basins: List,
-                    dates: List,
-                    with_basin_str: bool = True,
-                    seq_length: int = 270):
+def create_h5_files(
+    camels_root: PosixPath,
+    out_file: PosixPath,
+    basins: List,
+    dates: List,
+    with_basin_str: bool = True,
+    seq_length: int = 270,
+):
     """[summary]
-    
+
     Parameters
     ----------
     camels_root : PosixPath
@@ -43,7 +45,7 @@ def create_h5_files(camels_root: PosixPath,
         If True, stores for each sample the corresponding USGS gauged id, by default True
     seq_length : int, optional
         Length of the requested input sequences., by default 270
-    
+
     Raises
     ------
     FileExistsError
@@ -52,41 +54,51 @@ def create_h5_files(camels_root: PosixPath,
     if out_file.is_file():
         raise FileExistsError(f"File already exists at {out_file}")
 
-    with h5py.File(out_file, 'w') as out_f:
-        input_data = out_f.create_dataset('input_data',
-                                          shape=(0, seq_length, 6),
-                                          maxshape=(None, seq_length, 6),
-                                          chunks=True,
-                                          dtype=np.float32,
-                                          compression='gzip')
-        target_data = out_f.create_dataset('target_data',
-                                           shape=(0, 1),
-                                           maxshape=(None, 1),
-                                           chunks=True,
-                                           dtype=np.float32,
-                                           compression='gzip')
+    with h5py.File(out_file, "w") as out_f:
+        input_data = out_f.create_dataset(
+            "input_data",
+            shape=(0, seq_length, 6),
+            maxshape=(None, seq_length, 6),
+            chunks=True,
+            dtype=np.float32,
+            compression="gzip",
+        )
+        target_data = out_f.create_dataset(
+            "target_data",
+            shape=(0, 1),
+            maxshape=(None, 1),
+            chunks=True,
+            dtype=np.float32,
+            compression="gzip",
+        )
 
-        q_stds = out_f.create_dataset('q_stds',
-                                      shape=(0, 1),
-                                      maxshape=(None, 1),
-                                      dtype=np.float32,
-                                      compression='gzip',
-                                      chunks=True)
+        q_stds = out_f.create_dataset(
+            "q_stds",
+            shape=(0, 1),
+            maxshape=(None, 1),
+            dtype=np.float32,
+            compression="gzip",
+            chunks=True,
+        )
 
         if with_basin_str:
-            sample_2_basin = out_f.create_dataset('sample_2_basin',
-                                                  shape=(0, ),
-                                                  maxshape=(None, ),
-                                                  dtype="S10",
-                                                  compression='gzip',
-                                                  chunks=True)
+            sample_2_basin = out_f.create_dataset(
+                "sample_2_basin",
+                shape=(0,),
+                maxshape=(None,),
+                dtype="S10",
+                compression="gzip",
+                chunks=True,
+            )
         for basin in tqdm(basins, file=sys.stdout):
 
-            dataset = CamelsTXT(camels_root=camels_root,
-                                basin=basin,
-                                is_train=True,
-                                seq_length=seq_length,
-                                dates=dates)
+            dataset = CamelsTXT(
+                camels_root=camels_root,
+                basin=basin,
+                is_train=True,
+                seq_length=seq_length,
+                dates=dates,
+            )
 
             num_samples = len(dataset)
             total_samples = input_data.shape[0] + num_samples
@@ -99,11 +111,13 @@ def create_h5_files(camels_root: PosixPath,
 
             # additionally store std of discharge of this basin for each sample
             q_stds.resize((total_samples, 1))
-            q_std_array = np.array([dataset.q_std] * num_samples, dtype=np.float32).reshape(-1, 1)
+            q_std_array = np.array(
+                [dataset.q_std] * num_samples, dtype=np.float32
+            ).reshape(-1, 1)
             q_stds[-num_samples:, :] = q_std_array
 
             if with_basin_str:
-                sample_2_basin.resize((total_samples, ))
+                sample_2_basin.resize((total_samples,))
                 str_arr = np.array([basin.encode("ascii", "ignore")] * num_samples)
                 sample_2_basin[-num_samples:] = str_arr
 
@@ -112,12 +126,15 @@ def create_h5_files(camels_root: PosixPath,
 
 def get_basin_list() -> List:
     """Read list of basins from text file.
-    
+
     Returns
     -------
     List
         List containing the 8-digit basin code of all basins
     """
     basins = np.genfromtxt("data/basin_list.txt", dtype=str)
-    basins = np.delete(basins, np.argwhere(basins in ["18017", "18018"]))
+    # These two basins only have data until 1996, skipping them.
+    remove = np.array(["18017", "18018"])
+    for basin in remove:
+        basins = np.delete(basins, np.argwhere(basins == basin))
     return basins

@@ -121,14 +121,7 @@ class CamelsTXT(Dataset):
         df = df[start_date:end_date]
 
         # store first and last date of the selected period (including warm_start)
-        try:
-            self.period_start = df.index[0]
-        except IndexError:
-            print(start_date, end_date)
-            print(df)
-            print(df.index)
-            print(self.basin)
-            exit()
+        self.period_start = df.index[0]
         self.period_end = df.index[-1]
 
         # use all meteorological variables as inputs
@@ -176,7 +169,7 @@ class CamelsTXT(Dataset):
         df = load_attributes(self.db_path, [self.basin], drop_lat_lon=True)
 
         # normalize data
-        df = (df - self.attribute_means) / self.attribute_stds
+        # df = (df - self.attribute_means) / self.attribute_stds
 
         # store attribute names
         self.attribute_names = df.columns
@@ -234,7 +227,6 @@ class CamelsH5(Dataset):
         # preload data if cached is true
         if self.cache:
             (self.x, self.y, self.sample_2_basin, self.q_stds) = self._preload_data()
-
         # load attributes into data frame
         self._load_attributes()
 
@@ -266,7 +258,6 @@ class CamelsH5(Dataset):
         if not self.no_static:
             # get attributes from data frame and create 2d array with copies
             attributes = self.df.loc[self.df.index == basin].values
-
             if self.concat_static:
                 attributes = np.repeat(attributes, repeats=x.shape[0], axis=0)
                 # combine meteorological obs with static attributes
@@ -308,16 +299,17 @@ class CamelsH5(Dataset):
 
     def _load_attributes(self):
         df = load_attributes(self.db_path, self.basins, drop_lat_lon=True)
-
         # store means and stds
-        self.attribute_means = df.mean()
-        self.attribute_stds = df.std()
+        # Not normalizing now, need to make it work first
+        # self.attribute_means = df.mean()
+        # self.attribute_stds = df.std()
 
         # normalize data
-        df = (df - self.attribute_means) / self.attribute_stds
+        # df = (df - self.attribute_means) / self.attribute_stds
 
-        self.attribute_names = df.columns
+        # self.attribute_names = df.columns
         self.df = df
+        # print(self.df)
 
     def get_attribute_means(self) -> pd.Series:
         """Return means of catchment attributes

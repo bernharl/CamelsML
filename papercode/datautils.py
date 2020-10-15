@@ -161,8 +161,10 @@ def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
         # else:
         #    df = pd.concat([df, df_temp], axis=1)
     df = df.loc[:, ~df.columns.duplicated()]
-    np.savetxt("data/basin_list.txt", df["gauge_id"].values, fmt="%s")
+    df = df.select_dtypes(exclude=["object"])
+    # np.savetxt("data/basin_list.txt", df["gauge_id"].values, fmt="%s")
     df.set_index("gauge_id", inplace=True)
+    df.index = df.index.astype("str")
     # tmp to check
     df = df.dropna(axis=1)
     # convert huc column to double digit strings
@@ -210,7 +212,6 @@ def load_attributes(
     drop_basins = [b for b in df.index if str(b) not in basins]
     # return drop_basins, df
     df = df.drop(drop_basins, axis=0)
-
     # drop lat/lon col
     if drop_lat_lon:
         df = df.drop(["gauge_lat", "gauge_lon"], axis=1)
@@ -319,10 +320,8 @@ def reshape_data(
         The target value for each sample in x_new
     """
     num_samples, num_features = x.shape
-
     x_new = np.zeros((num_samples - seq_length + 1, seq_length, num_features))
     y_new = np.zeros((num_samples - seq_length + 1, 1))
-
     for i in range(0, x_new.shape[0]):
         x_new[i, :, :num_features] = x[i : i + seq_length, :]
         y_new[i, :] = y[i + seq_length - 1, 0]

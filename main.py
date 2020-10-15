@@ -27,7 +27,12 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from papercode.datasets import CamelsH5, CamelsTXT
-from papercode.datautils import add_camels_attributes, load_attributes, rescale_features
+from papercode.datautils import (
+    add_camels_attributes,
+    load_attributes,
+    rescale_features,
+    load_forcing,
+)
 from papercode.ealstm import EALSTM
 from papercode.lstm import LSTM
 from papercode.metrics import calc_nse
@@ -112,6 +117,8 @@ def get_args() -> Dict:
         help="If True, uses mean squared error as loss function.",
     )
     cfg = vars(parser.parse_args())
+    # print(cfg["no_static"])
+    # exit()
 
     # Validation checks
     if (cfg["mode"] == "train") and (cfg["seed"] is None):
@@ -333,7 +340,6 @@ def train(cfg):
 
     # prepare data for training
     cfg = _prepare_data(cfg=cfg, basins=basins)
-
     # prepare PyTorch DataLoader
     ds = CamelsH5(
         h5_file=cfg["train_file"],
@@ -343,13 +349,16 @@ def train(cfg):
         cache=cfg["cache_data"],
         no_static=cfg["no_static"],
     )
+    num_static = ds[0][1].size()[1]
     loader = DataLoader(
         ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=cfg["num_workers"]
     )
 
     # create model and optimizer
-    input_size_stat = 0 if cfg["no_static"] else 27
-    input_size_dyn = 5 if (cfg["no_static"] or not cfg["concat_static"]) else 32
+    input_size_stat = 0 if cfg["no_static"] else num_static
+    input_size_dyn = (
+        6 if (cfg["no_static"] or not cfg["concat_static"]) else 6 + num_static
+    )
     model = Model(
         input_size_dyn=input_size_dyn,
         input_size_stat=input_size_stat,
@@ -475,10 +484,15 @@ def evaluate(user_cfg: Dict):
     attributes = load_attributes(db_path=db_path, basins=basins, drop_lat_lon=True)
     means = attributes.mean()
     stds = attributes.std()
-
+    attrs_count = len(attributes.columns)
+    timeseries_count = 6
     # create model
-    input_size_stat = 0 if run_cfg["no_static"] else 27
-    input_size_dyn = 5 if (run_cfg["no_static"] or not run_cfg["concat_static"]) else 32
+    input_size_stat = timeseries_count if run_cfg["no_static"] else attrs_count
+    input_size_dyn = (
+        timeseries_count
+        if (run_cfg["no_static"] or not run_cfg["concat_static"])
+        else timeseries_count + attrs_count
+    )
     model = Model(
         input_size_dyn=input_size_dyn,
         input_size_stat=input_size_stat,
@@ -497,28 +511,38 @@ def evaluate(user_cfg: Dict):
     )
     results = {}
     for basin in tqdm(basins):
-        ds_test = CamelsTXT(
-            camels_root=user_cfg["camels_root"],
-            basin=basin,
-            dates=[GLOBAL_SETTINGS["val_start"], GLOBAL_SETTINGS["val_end"]],
-            is_train=False,
-            seq_length=run_cfg["seq_length"],
-            with_attributes=True,
-            attribute_means=means,
-            attribute_stds=stds,
-            concat_static=run_cfg["concat_static"],
-            db_path=db_path,
-        )
+        try:
+            ds_test = CamelsTXT(
+                camels_root=user_cfg["camels_root"],
+                basin=basin,
+                dates=[GLOBAL_SETTINGS["val_start"], GLOBAL_SETTINGS["val_end"]],
+                is_train=False,
+                seq_length=run_cfg["seq_length"],
+                with_attributes=True,
+                attribute_means=means,
+                attribute_stds=stds,
+                concat_static=run_cfg["concat_static"],
+                db_path=db_path,
+            )
+        except ValueError:
+            tqdm.write(f"Skipped {basin} because CamelsTXT crashed")
+            continue
+        except IndexError:
+            tqdm.write(f"Skipped {basin} because 0 length")
+            continue
         loader = DataLoader(ds_test, batch_size=1024, shuffle=False, num_workers=4)
 
         preds, obs = evaluate_basin(model, loader)
-
-        df = pd.DataFrame(
-            data={"qobs": obs.flatten(), "qsim": preds.flatten()}, index=date_range
-        )
+        try:
+            df = pd.DataFrame(
+                data={"qobs": obs.flatten(), "qsim": preds.flatten()}, index=date_range
+            )
+        except ValueError:
+            tqdm.write(f"Skipped {basin} because of missing data")
+            continue
 
         results[basin] = df
-
+    print(f"Saved {len(results)} basins")
     _store_results(user_cfg, run_cfg, results)
 
 
@@ -545,7 +569,6 @@ def evaluate_basin(
     model.eval()
 
     preds, obs = None, None
-
     with torch.no_grad():
         for data in loader:
             if len(data) == 2:

@@ -89,7 +89,6 @@ def get_run_dirs(root_dir: PosixPath, model: str, loss: str) -> List:
                     run_dirs.append(folder)
                 else:
                     pass
-
     return run_dirs
 
 
@@ -127,7 +126,7 @@ def eval_benchmark_models(netcdf_folder: PosixPath, func: Callable) -> dict:
     return benchmark_models
 
 
-def eval_lstm_models(run_dirs: List, func: Callable) -> dict:
+def eval_lstm_models(run_dirs: List, func: Callable, epoch: int = 30) -> dict:
     """Evaluate LSTM outputs on specific metric function.
 
     Returns the metric for each basin in each seed, as well as the results of the ensemble mean.

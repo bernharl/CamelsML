@@ -43,7 +43,6 @@ class EALSTM(nn.Module):
                  batch_first: bool = True,
                  initial_forget_bias: int = 0):
         super(EALSTM, self).__init__()
-
         self.input_size_dyn = input_size_dyn
         self.input_size_stat = input_size_stat
         self.hidden_size = hidden_size
