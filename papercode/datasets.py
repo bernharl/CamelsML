@@ -169,7 +169,7 @@ class CamelsTXT(Dataset):
         df = load_attributes(self.db_path, [self.basin], drop_lat_lon=True)
 
         # normalize data
-        # df = (df - self.attribute_means) / self.attribute_stds
+        df = (df - self.attribute_means) / self.attribute_stds
 
         # store attribute names
         self.attribute_names = df.columns
@@ -301,11 +301,11 @@ class CamelsH5(Dataset):
         df = load_attributes(self.db_path, self.basins, drop_lat_lon=True)
         # store means and stds
         # Not normalizing now, need to make it work first
-        # self.attribute_means = df.mean()
-        # self.attribute_stds = df.std()
+        self.attribute_means = df.mean()
+        self.attribute_stds = df.std()
 
         # normalize data
-        # df = (df - self.attribute_means) / self.attribute_stds
+        df = (df - self.attribute_means) / self.attribute_stds
 
         # self.attribute_names = df.columns
         self.df = df

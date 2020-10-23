@@ -56,16 +56,20 @@ INVALID_ATTR = [
 ]
 
 # Maurer mean/std calculated over all basins in period 01.10.1999 until 30.09.2008
-SCALER = {
-    "input_means": np.array(
-        [3.17563234, 372.01003929, 17.31934062, 3.97393362, 924.98004197]
-    ),
-    "input_stds": np.array(
-        [6.94344737, 131.63560881, 10.86689718, 10.3940032, 629.44576432]
-    ),
-    "output_mean": np.array([1.49996196]),
-    "output_std": np.array([3.62443672]),
-}
+SCALER = {}
+
+
+def correct_scaler_inputs(df: pd.DataFrame):
+    means = df.drop(["Year", "Mnth", "Day", "Hr"], axis=1).mean(axis=0).to_numpy()
+    SCALER["input_means"] = means
+    stds = df.drop(["Year", "Mnth", "Day", "Hr"], axis=1).std(axis=0).to_numpy()
+
+
+def correct_scaler_output(df: pd.DataFrame):
+    mean = df.mean()
+    SCALER["output_mean"] = mean
+    std = df.std()
+    SCALER["output_std"] = std
 
 
 def add_camels_us_attributes(camels_root: PosixPath, db_path: str = None):
@@ -223,7 +227,6 @@ def load_attributes(
         drop_names = [c for c in df.columns if c in INVALID_ATTR]
 
     df = df.drop(drop_names, axis=1)
-
     return df
 
 
@@ -371,6 +374,7 @@ def load_forcing(camels_root: Path, basin: str) -> Tuple[pd.DataFrame, int]:
     df["Date"] = dates
     df.drop("date", axis=1, inplace=True)
     df.set_index("Date", inplace=True)
+    correct_scaler_inputs(df)
     return df, 1
 
 
@@ -401,14 +405,22 @@ def load_discharge(camels_root: Path, basin: str, area: int) -> pd.Series:
     df = df["discharge_spec"]
     df.fillna(0, inplace=True)
     df = pd.to_numeric(df)
-    # df = df[dates[0] : dates[-1]]
+
+    correct_scaler_output(df)
     return df
 
 
 if __name__ == "__main__":
     # add_camels_attributes(camels_root="/home/bernhard/git/datasets_masters/camels_us/basin_dataset_public_v1p2", db_path="camels_us")
-    add_camels_gb_attributes(
-        camels_root="/home/bernhard/git/datasets_masters/camels_gb",
-        db_path="converted_gb/attributes.db",
+    # add_camels_attributes(
+    #     camels_root="/home/bernhard/git/datasets_masters/camels_gb",
+    #     db_path="converted_gb/attributes.db",
+    # )
+    forcing, area = load_forcing(
+        camels_root="/home/bernhard/git/datasets_masters/camels_gb", basin=1001
     )
+    load_discharge(
+        camels_root="/home/bernhard/git/datasets_masters/camels_gb", area=1, basin=1001
+    )
+    print(SCALER)
     # print(load_attributes(db_path="camels_us", basins=["01013500"]))

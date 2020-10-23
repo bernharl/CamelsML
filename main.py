@@ -45,7 +45,7 @@ from papercode.utils import create_h5_files, get_basin_list
 
 # fixed settings for all experiments
 GLOBAL_SETTINGS = {
-    "batch_size": 256,
+    "batch_size": 512,
     "clip_norm": True,
     "clip_value": 1,
     "dropout": 0.4,
