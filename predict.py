@@ -61,7 +61,7 @@ def predict_basin(
     # load trained model
     weight_file = run_dir / f"model_epoch{epoch}.pt"
     model.load_state_dict(torch.load(weight_file, map_location=DEVICE))
-   
+
     date_range = pd.date_range(
         start=GLOBAL_SETTINGS[f"{period}_start"], end=GLOBAL_SETTINGS[f"{period}_end"]
     )
@@ -84,11 +84,11 @@ def predict_basin(
     )
 
     results = df
-    plt.plot(date_range, results["qobs"], label="Obs")
-    plt.plot(date_range, results["qsim"], label="Preds")
-    plt.legend()
-    plt.savefig(f"{run_dir}/pred_basin_{basin}.pdf")
-    plt.close()
+    # plt.plot(date_range, results["qobs"], label="Obs")
+    # plt.plot(date_range, results["qsim"], label="Preds")
+    # plt.legend()
+    # plt.savefig(f"{run_dir}/pred_basin_{basin}.pdf")
+    # plt.close()
     return results, date_range
 
 
@@ -112,9 +112,10 @@ if __name__ == "__main__":
         "/home/bernhard/git/datasets_masters/camels_gb",
         "val",
     )[0]
-    plt.plot(date_range, ealstm["qsim"],"--", label="EALSTM")
-    plt.plot(date_range, concat["qsim"],"--", label="Concat lstm")
-    plt.plot(date_range, lstm["qsim"],"--", label="Lstm no static")
-    plt.plot(date_range, concat["qobs"],":", label="Observations")
+    plt.plot(date_range, ealstm["qsim"], "--", label=f"EALSTM, nse={0.58}")
+    plt.plot(date_range, concat["qsim"], "--", label=f"Concat lstm, nse={0.84}")
+    plt.plot(date_range, lstm["qsim"], "--", label=f"Lstm no static, nse={0.27}")
+    plt.plot(date_range, concat["qobs"], ":", label="Observations")
+    plt.title("Basin 96004")
     plt.legend()
     plt.savefig("figures/comparison.pdf")
