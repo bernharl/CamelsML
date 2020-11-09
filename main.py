@@ -17,7 +17,7 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path, PosixPath
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -45,7 +45,7 @@ from papercode.utils import create_h5_files, get_basin_list
 
 # fixed settings for all experiments
 GLOBAL_SETTINGS = {
-    "batch_size": 512,
+    "batch_size": 1024,
     "clip_norm": True,
     "clip_value": 1,
     "dropout": 0.4,
@@ -55,10 +55,10 @@ GLOBAL_SETTINGS = {
     "log_interval": 50,
     "learning_rate": 1e-3,
     "seq_length": 270,
-    "train_start": pd.to_datetime("01101999", format="%d%m%Y"),
-    "train_end": pd.to_datetime("30092008", format="%d%m%Y"),
-    "val_start": pd.to_datetime("01101989", format="%d%m%Y"),
-    "val_end": pd.to_datetime("30091999", format="%d%m%Y"),
+    "train_start": pd.to_datetime("01101988", format="%d%m%Y"),
+    "train_end": pd.to_datetime("30092015", format="%d%m%Y"),
+    "val_start": pd.to_datetime("01011971", format="%d%m%Y"),
+    "val_end": pd.to_datetime("30091988", format="%d%m%Y"),
 }
 
 # check if GPU is available
@@ -116,10 +116,23 @@ def get_args() -> Dict:
         default=False,
         help="If True, uses mean squared error as loss function.",
     )
+    parser.add_argument(
+        "--split_train_test_folder",
+        type=str,
+        default=None,
+        help="If defined, the training will only train on the train split in the folder, while evaluation will only happen on the test state",
+    )
+    parser.add_argument(
+        "--cross_validation_run",
+        type=bool,
+        default=False,
+        help="NOT IMPLEMENTED. Whether to use cross validation.",
+    )
     cfg = vars(parser.parse_args())
     # print(cfg["no_static"])
     # exit()
-
+    if cfg["cross_validation_run"]:
+        raise NotImplementedError("Cross validation is not yet implemented.")
     # Validation checks
     if (cfg["mode"] == "train") and (cfg["seed"] is None):
         # generate random seed for this run
@@ -333,7 +346,10 @@ def train(cfg):
     torch.cuda.manual_seed(cfg["seed"])
     torch.manual_seed(cfg["seed"])
 
-    basins = get_basin_list()
+    if cfg["split_train_test_folder"] is not None:
+        basins = get_basin_list(f"{cfg['split_train_test_folder']}/basins_train.txt")
+    else:
+        basins = get_basin_list()
 
     # create folder structure for this run
     cfg = _setup_run(cfg)
@@ -349,16 +365,16 @@ def train(cfg):
         cache=cfg["cache_data"],
         no_static=cfg["no_static"],
     )
-    num_static = ds[0][1].size()[1]
+    input_size_dyn = ds[0][0].size()[1]
+    if cfg["no_static"] or cfg["concat_static"]:
+        input_size_stat = 0
+    else:
+        input_size_stat = ds[0][1].size()[1]
     loader = DataLoader(
         ds, batch_size=cfg["batch_size"], shuffle=True, num_workers=cfg["num_workers"]
     )
 
     # create model and optimizer
-    input_size_stat = 0 if cfg["no_static"] else num_static
-    input_size_dyn = (
-        6 if (cfg["no_static"] or not cfg["concat_static"]) else 6 + num_static
-    )
     model = Model(
         input_size_dyn=input_size_dyn,
         input_size_stat=input_size_stat,
@@ -477,7 +493,10 @@ def evaluate(user_cfg: Dict):
     with open(user_cfg["run_dir"] / "cfg.json", "r") as fp:
         run_cfg = json.load(fp)
 
-    basins = get_basin_list()
+    if cfg["split_train_test_folder"] is not None:
+        basins = get_basin_list(f"{cfg['split_train_test_folder']}/basins_test.txt")
+    else:
+        basins = get_basin_list()
 
     # get attribute means/stds
     db_path = str(user_cfg["run_dir"] / "attributes.db")
@@ -511,6 +530,8 @@ def evaluate(user_cfg: Dict):
     )
     results = {}
     for basin in tqdm(basins):
+        if not basin == "96004":
+            continue
         try:
             ds_test = CamelsTXT(
                 camels_root=user_cfg["camels_root"],
@@ -531,7 +552,6 @@ def evaluate(user_cfg: Dict):
             tqdm.write(f"Skipped {basin} because 0 length")
             continue
         loader = DataLoader(ds_test, batch_size=1024, shuffle=False, num_workers=4)
-
         preds, obs = evaluate_basin(model, loader)
         try:
             df = pd.DataFrame(
@@ -542,6 +562,7 @@ def evaluate(user_cfg: Dict):
             continue
 
         results[basin] = df
+    exit(1)
     print(f"Saved {len(results)} basins")
     _store_results(user_cfg, run_cfg, results)
 
@@ -627,7 +648,10 @@ def eval_robustness(user_cfg: Dict):
             "This function is only implemented for EA-LSTM models"
         )
 
-    basins = get_basin_list()
+    if cfg["split_train_test_folder"] is not None:
+        basins = get_basin_list(f"{cfg['split_train_test_folder']}/basins_test.txt")
+    else:
+        basins = get_basin_list()
 
     # get attribute means/stds
     db_path = str(user_cfg["run_dir"] / "attributes.db")

@@ -11,7 +11,7 @@ see <https://opensource.org/licenses/Apache-2.0>
 
 import sys
 from pathlib import Path, PosixPath
-from typing import List
+from typing import List, Union
 
 import h5py
 import numpy as np
@@ -124,7 +124,7 @@ def create_h5_files(
             out_f.flush()
 
 
-def get_basin_list() -> List:
+def get_basin_list(split: Union[str, Path, None] = None) -> List:
     """Read list of basins from text file.
 
     Returns
@@ -132,7 +132,11 @@ def get_basin_list() -> List:
     List
         List containing the 8-digit basin code of all basins
     """
-    basins = np.genfromtxt("data/basin_list.txt", dtype=str)
+    if split is not None:
+        folder = split
+    else:
+        folder = "data/basin_list.txt"
+    basins = np.genfromtxt(folder, dtype=str)
     # These two basins only have data until 1996, skipping them.
     remove = np.array(["18017", "18018"])
     for basin in remove:
