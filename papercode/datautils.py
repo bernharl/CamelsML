@@ -16,6 +16,7 @@ from typing import List, Tuple
 import numpy as np
 import pandas as pd
 from numba import njit
+from tqdm import tqdm
 
 # CAMELS catchment characteristics ignored in this study
 INVALID_ATTR = [
@@ -332,7 +333,7 @@ def reshape_data(
     return x_new, y_new
 
 
-def load_forcing(camels_root: Path, basin: str) -> Tuple[pd.DataFrame, int]:
+def load_forcing(camels_root: Path, basin: str, remove_nan: bool = True) -> Tuple[pd.DataFrame, int]:
     """Load the meteorological forcing data of a specific basin.
 
     :param basin: 8-digit code of basin as string.
@@ -354,7 +355,12 @@ def load_forcing(camels_root: Path, basin: str) -> Tuple[pd.DataFrame, int]:
         / f"CAMELS_GB_hydromet_timeseries_{basin}_19701001-20150930.csv"
     )
     exclude = ["pet", "discharge_vol", "discharge_spec", "peti"]
-    df = pd.read_csv(path).dropna()
+    df = pd.read_csv(path)
+    #print(df[df.isna().any(axis=1)])
+    #tqdm.write(f"Basin {basin} before dropna: {len(df)}")
+    if remove_nan:
+        df = df.dropna()
+    #tqdm.write(f"Basin {basin} after dropna: {len(df)}")
     columns = df.columns.values
     df = df.drop(exclude, axis=1)
     dates = pd.to_datetime(df["date"])

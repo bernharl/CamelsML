@@ -62,9 +62,6 @@ def predict_basin(
     weight_file = run_dir / f"model_epoch{epoch}.pt"
     model.load_state_dict(torch.load(weight_file, map_location=DEVICE))
 
-    date_range = pd.date_range(
-        start=GLOBAL_SETTINGS[f"{period}_start"], end=GLOBAL_SETTINGS[f"{period}_end"]
-    )
     ds_test = CamelsTXT(
         camels_root=camels_dir,
         basin=basin,
@@ -77,6 +74,7 @@ def predict_basin(
         concat_static=run_cfg["concat_static"],
         db_path=db_path,
     )
+    date_range = ds_test.dates_index[run_cfg["seq_length"]-1:]
     loader = DataLoader(ds_test, batch_size=1024, shuffle=False, num_workers=4)
     preds, obs = evaluate_basin(model, loader)
     df = pd.DataFrame(

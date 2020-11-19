@@ -89,7 +89,6 @@ class CamelsTXT(Dataset):
         self.attribute_names = None
 
         self.x, self.y = self._load_data()
-
         if self.with_attributes:
             self.attributes = self._load_attributes()
 
@@ -110,20 +109,18 @@ class CamelsTXT(Dataset):
         else:
             return self.x[idx], self.y[idx]
 
-    def _load_data(self) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _load_data(self) -> Tuple[torch.Tensor, torch.Tensor, np.ndarray]:
         """Load input and output data from text files."""
         df, area = load_forcing(self.camels_root, self.basin)
         df["QObs(mm/d)"] = load_discharge(self.camels_root, self.basin, area)
-
         # we use (seq_len) time steps before start for warmup
         start_date = self.dates[0] - pd.DateOffset(days=self.seq_length - 1)
         end_date = self.dates[1]
         df = df[start_date:end_date]
-
         # store first and last date of the selected period (including warm_start)
         self.period_start = df.index[0]
         self.period_end = df.index[-1]
-
+        self.dates_index = df.index
         # use all meteorological variables as inputs
         x = np.array(
             [

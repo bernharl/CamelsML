@@ -45,7 +45,7 @@ from papercode.utils import create_h5_files, get_basin_list
 
 # fixed settings for all experiments
 GLOBAL_SETTINGS = {
-    "batch_size": 1024,
+    "batch_size": 1536,
     "clip_norm": True,
     "clip_value": 1,
     "dropout": 0.4,
@@ -57,8 +57,10 @@ GLOBAL_SETTINGS = {
     "seq_length": 270,
     "train_start": pd.to_datetime("01101988", format="%d%m%Y"),
     "train_end": pd.to_datetime("30092015", format="%d%m%Y"),
-    "val_start": pd.to_datetime("01011971", format="%d%m%Y"),
-    "val_end": pd.to_datetime("30091988", format="%d%m%Y"),
+    "val_start": pd.to_datetime("01101971", format="%d%m%Y"),
+    #"val_start": pd.to_datetime("01101979", format="%d%m%Y"),
+    # "val_end": pd.to_datetime("30091988", format="%d%m%Y"),
+    "val_end": pd.to_datetime("30092015", format="%d%m%Y"),
 }
 
 # check if GPU is available
@@ -127,6 +129,12 @@ def get_args() -> Dict:
         type=bool,
         default=False,
         help="NOT IMPLEMENTED. Whether to use cross validation.",
+    )
+    parser.add_argument(
+        "--eval_epoch",
+        type=int,
+        default=GLOBAL_SETTINGS["epochs"],
+        help="What epoch to evaluate",
     )
     cfg = vars(parser.parse_args())
     # print(cfg["no_static"])
@@ -493,8 +501,10 @@ def evaluate(user_cfg: Dict):
     with open(user_cfg["run_dir"] / "cfg.json", "r") as fp:
         run_cfg = json.load(fp)
 
-    if cfg["split_train_test_folder"] is not None:
-        basins = get_basin_list(f"{cfg['split_train_test_folder']}/basins_test.txt")
+    if user_cfg["split_train_test_folder"] is not None:
+        basins = get_basin_list(
+            f"{user_cfg['split_train_test_folder']}/basins_test.txt"
+        )
     else:
         basins = get_basin_list()
 
@@ -522,16 +532,11 @@ def evaluate(user_cfg: Dict):
     ).to(DEVICE)
 
     # load trained model
-    weight_file = user_cfg["run_dir"] / "model_epoch30.pt"
+    weight_file = user_cfg["run_dir"] / f"model_epoch{user_cfg['eval_epoch']}.pt"
     model.load_state_dict(torch.load(weight_file, map_location=DEVICE))
 
-    date_range = pd.date_range(
-        start=GLOBAL_SETTINGS["val_start"], end=GLOBAL_SETTINGS["val_end"]
-    )
     results = {}
     for basin in tqdm(basins):
-        if not basin == "96004":
-            continue
         try:
             ds_test = CamelsTXT(
                 camels_root=user_cfg["camels_root"],
@@ -545,24 +550,24 @@ def evaluate(user_cfg: Dict):
                 concat_static=run_cfg["concat_static"],
                 db_path=db_path,
             )
-        except ValueError:
+        except ValueError as e:
+            # raise e
             tqdm.write(f"Skipped {basin} because CamelsTXT crashed")
             continue
-        except IndexError:
+        except IndexError as e:
+            # raise e
             tqdm.write(f"Skipped {basin} because 0 length")
             continue
         loader = DataLoader(ds_test, batch_size=1024, shuffle=False, num_workers=4)
         preds, obs = evaluate_basin(model, loader)
         try:
             df = pd.DataFrame(
-                data={"qobs": obs.flatten(), "qsim": preds.flatten()}, index=date_range
+                data={"qobs": obs.flatten(), "qsim": preds.flatten()}, index=ds_test.dates_index[run_cfg["seq_length"]-1:]
             )
-        except ValueError:
+        except ValueError as e:
             tqdm.write(f"Skipped {basin} because of missing data")
             continue
-
         results[basin] = df
-    exit(1)
     print(f"Saved {len(results)} basins")
     _store_results(user_cfg, run_cfg, results)
 
