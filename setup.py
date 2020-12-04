@@ -1,7 +1,7 @@
 from setuptools import setup
-import pip
+import pathlib
 
-requirements = pip.req.parse_requirements("requirements.txt")
+requirements = Path("requirements.txt").read_text().splitlines()
 
 setup(
     install_requires=requirements,
