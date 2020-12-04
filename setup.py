@@ -13,14 +13,13 @@ with open(folder / PACKAGE_NAME / "version.py") as fp:
 packs = find_packages(where=folder, exclude=("tests*",))
 
 with open(folder / "requirements.txt") as fp:
-    requirements = fp.read()
+    requirements = fp.read().split("\n")[8:]
 
 with open("README.md") as fp:
     readme = fp.read()
 
 with open("LICENSE") as fp:
     license = fp.read()
-
 setup(
     name=PACKAGE_NAME,
     version=version["__version__"],
