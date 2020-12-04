@@ -55,6 +55,8 @@ GLOBAL_SETTINGS = {
     "log_interval": 50,
     "learning_rate": 1e-3,
     "seq_length": 270,
+    #"train_start": pd.to_datetime("01101971", format="%d%m%Y"),
+    # When to start?
     "train_start": pd.to_datetime("01101988", format="%d%m%Y"),
     "train_end": pd.to_datetime("30092015", format="%d%m%Y"),
     "val_start": pd.to_datetime("01101971", format="%d%m%Y"),
