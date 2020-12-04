@@ -1,10 +1,16 @@
 # Main code for my master thesis
 
 
-## Content of the repository
+# Installation
+- If you use pipenv and pyenv:
+```
+pipenv install -e git+https://github.com/bernharl/ealstm_regional_modeling_camels_gb.git#egg=camelsml --python 3.8
+```
+- If only using pipenv, make sure to manually fix the Python version. Pytorch doesn't support Python >= 3.9 as of December 4th 2020.
+- If not using pipenv, this repository should be installable using pip as well.
 
-- `main.py` Main python file used for training and evaluating of our models, as well as to perform the robustness analysis
-- `papercode/` contains the entire code (beside the in the root directory `main.py` file)
+## Content of the repository
+- will add later
 
 
 ## Citation
