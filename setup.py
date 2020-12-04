@@ -18,7 +18,7 @@ with open(folder / 'requirements.txt') as fp:
 with open('README.md') as fp:
     readme = fp.read()
 
-with open('LICENCE') as fp:
+with open('LICENSE') as fp:
     license = fp.read()
 
 setup(
