@@ -31,6 +31,6 @@ setup(
     author_email='bernhardnorneslotsberg@gmail.com',
     license=license,
     packages=packs,
-    package_dir={'': SRC_FOLDER},
+    package_dir={'': camelsml},
     install_requires=requirements,
 )
