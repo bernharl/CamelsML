@@ -30,6 +30,6 @@ setup(
     author_email="bernhardnorneslotsberg@gmail.com",
     license=license,
     packages=packs,
-    package_dir={"": "camelsml"},
+    #package_dir={"": "camelsml"},
     install_requires=requirements,
 )
