@@ -54,6 +54,19 @@ INVALID_ATTR = [
     "flow_period_start",
     "flow_period_end",
     "quncert_meta",
+    # Parameters describing missing values should be ignored?
+    "sand_perc_missing",
+    "silt_perc_missing",
+    "clay_perc_missing",
+    "organic_perc_missing",
+    "bulkdens_missing",
+    "tawc_missing",
+    "porosity_cosby_missing",
+    "porosity_hypres_missing",
+    "conductivity_cosby_missing",
+    "conductivity_hypres_missing",
+    "root_depth_missing",
+    "soil_depth_pelletier_missing",
 ]
 
 # Maurer mean/std calculated over all basins in period 01.10.1999 until 30.09.2008
@@ -333,7 +346,9 @@ def reshape_data(
     return x_new, y_new
 
 
-def load_forcing(camels_root: Path, basin: str, remove_nan: bool = True) -> Tuple[pd.DataFrame, int]:
+def load_forcing(
+    camels_root: Path, basin: str, remove_nan: bool = True
+) -> Tuple[pd.DataFrame, int]:
     """Load the meteorological forcing data of a specific basin.
 
     :param basin: 8-digit code of basin as string.
@@ -356,11 +371,11 @@ def load_forcing(camels_root: Path, basin: str, remove_nan: bool = True) -> Tupl
     )
     exclude = ["pet", "discharge_vol", "discharge_spec", "peti"]
     df = pd.read_csv(path)
-    #print(df[df.isna().any(axis=1)])
-    #tqdm.write(f"Basin {basin} before dropna: {len(df)}")
+    # print(df[df.isna().any(axis=1)])
+    # tqdm.write(f"Basin {basin} before dropna: {len(df)}")
     if remove_nan:
         df = df.dropna()
-    #tqdm.write(f"Basin {basin} after dropna: {len(df)}")
+    # tqdm.write(f"Basin {basin} after dropna: {len(df)}")
     columns = df.columns.values
     df = df.drop(exclude, axis=1)
     dates = pd.to_datetime(df["date"])
