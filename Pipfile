@@ -18,6 +18,8 @@ scipy = "*"
 tqdm = "*"
 jupyterlab = "*"
 nb-black = "*"
+statsmodels = "*"
+seaborn = "*"
 
 [requires]
 python_version = "3.8"
