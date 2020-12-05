@@ -5,3 +5,6 @@
 */.ipynb_checkpoints/*.ipynb
 .vscode
 runs/
+
+build/
+*.egg-info/
