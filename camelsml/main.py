@@ -26,25 +26,25 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from papercode.datasets import CamelsH5, CamelsTXT
-from papercode.datautils import (
+from .datasets import CamelsH5, CamelsTXT
+from .datautils import (
     add_camels_attributes,
     load_attributes,
     rescale_features,
     load_forcing,
 )
-from papercode.ealstm import EALSTM
-from papercode.lstm import LSTM
-from papercode.metrics import calc_nse
-from papercode.nseloss import NSELoss
-from papercode.utils import create_h5_files, get_basin_list
+from .ealstm import EALSTM
+from .lstm import LSTM
+from .metrics import calc_nse
+from .nseloss import NSELoss
+from .utils import create_h5_files, get_basin_list
 
 ###########
 # Globals #
 ###########
 
 # fixed settings for all experiments
-GLOBAL_SETTINGS = {
+"""GLOBAL_SETTINGS = {
     "batch_size": 1536,
     "clip_norm": True,
     "clip_value": 1,
@@ -55,25 +55,25 @@ GLOBAL_SETTINGS = {
     "log_interval": 50,
     "learning_rate": 1e-3,
     "seq_length": 270,
-    #"train_start": pd.to_datetime("01101971", format="%d%m%Y"),
+    # "train_start": pd.to_datetime("01101971", format="%d%m%Y"),
     # When to start?
     "train_start": pd.to_datetime("01101988", format="%d%m%Y"),
     "train_end": pd.to_datetime("30092015", format="%d%m%Y"),
     "val_start": pd.to_datetime("01101971", format="%d%m%Y"),
-    #"val_start": pd.to_datetime("01101979", format="%d%m%Y"),
+    # "val_start": pd.to_datetime("01101979", format="%d%m%Y"),
     # "val_end": pd.to_datetime("30091988", format="%d%m%Y"),
     "val_end": pd.to_datetime("30092015", format="%d%m%Y"),
-}
+}"""
 
 # check if GPU is available
-DEVICE = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+# DEVICE = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
 ###############
 # Prepare run #
 ###############
 
 
-def get_args() -> Dict:
+def get_args_remove_test() -> Dict:
     """Parse input arguments
 
     Returns
@@ -168,6 +168,73 @@ def get_args() -> Dict:
     return cfg
 
 
+def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> Dict:
+    if not isinstance(cfg_file, Path):
+        try:
+            cfg_file = Path(cfg_file)
+        except TypeError:
+            raise TypeError(
+                f"cfg file must be convertible to Path, not {type(cfg_file)}"
+            )
+    cfg = {}
+    date_type = lambda date: pd.to_datetime(date, format="%d%m%Y")
+
+    def bool_type(var):
+        if var in ("True", "False"):
+            return var == "True"
+        elif var in (0, 1):
+            return bool(var)
+        else:
+            raise TypeError("A variable could not be converted to bool, check config")
+
+    types = {
+        "epochs": int,
+        "camels_root": Path,
+        "run_dir": Path,
+        "train_start": date_type,
+        "train_end": date_type,
+        "val_start": date_type,
+        "val_end": date_type,
+        "test_start": date_type,
+        "test_end": date_type,
+        "device": str,
+        "learning_rate": float,
+        "seq_length": int,
+        "batch_size": int,
+        "clip_norm": bool_type,
+        "clip_value": int,
+        "dropout": float,
+        "seed": int,
+        "cache_data": bool_type,
+        "num_workers": int,
+        "no_static": bool_type,
+        "concat_static": bool_type,
+        "eval_epoch": int,
+        "hidden_size": int,
+        "log_interval": int,
+        "initial_forget_gate_bias": float,
+    }
+    cfg["num_workers"] = num_workers
+    cfg["device"] = device
+    with open(cfg_file, "r") as infile:
+        for line in infile:
+            if line[0] == "#":
+                continue
+            for i, sign in enumerate(line):
+                if sign == "#":
+                    line = line[:i]
+            line = line.split(": ")
+            key = line[0]
+            value = line[1][:-1]
+            try:
+                cfg[key] = types[key](value)
+            except KeyError:
+                raise NotImplementedError(
+                    f"No functionality for setting {key} implemented"
+                )
+    return cfg
+
+
 def _setup_run(cfg: Dict) -> Dict:
     """Create folder structure for this run
 
@@ -187,7 +254,8 @@ def _setup_run(cfg: Dict) -> Dict:
     hour = f"{now.hour}".zfill(2)
     minute = f"{now.minute}".zfill(2)
     run_name = f'run_{day}{month}_{hour}{minute}_seed{cfg["seed"]}'
-    cfg["run_dir"] = Path(__file__).absolute().parent / "runs" / run_name
+    # cfg["run_dir"] = Path(__file__).absolute().parent / "runs" / run_name
+    cfg["run_dir"] = cfg["run_dir"] / run_name
     if not cfg["run_dir"].is_dir():
         cfg["train_dir"] = cfg["run_dir"] / "data" / "train"
         cfg["train_dir"].mkdir(parents=True)
@@ -393,9 +461,11 @@ def train(cfg):
         dropout=cfg["dropout"],
         concat_static=cfg["concat_static"],
         no_static=cfg["no_static"],
-    ).to(DEVICE)
+    ).to(cfg["device"])
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg["learning_rate"])
 
+    # Temp fix
+    cfg["use_mse"] = False
     # define loss function
     if cfg["use_mse"]:
         loss_func = nn.MSELoss()
@@ -461,13 +531,21 @@ def train_epoch(
         # forward pass through LSTM
         if len(data) == 3:
             x, y, q_stds = data
-            x, y, q_stds = x.to(DEVICE), y.to(DEVICE), q_stds.to(DEVICE)
+            x, y, q_stds = (
+                x.to(cfg["device"]),
+                y.to(cfg["device"]),
+                q_stds.to(cfg["device"]),
+            )
             predictions = model(x)[0]
 
         # forward pass through EALSTM
         elif len(data) == 4:
             x_d, x_s, y, q_stds = data
-            x_d, x_s, y = x_d.to(DEVICE), x_s.to(DEVICE), y.to(DEVICE)
+            x_d, x_s, y = (
+                x_d.to(cfg["device"]),
+                x_s.to(cfg["device"]),
+                y.to(cfg["device"]),
+            )
             predictions = model(x_d, x_s[:, 0, :])[0]
 
         # MSELoss
@@ -476,7 +554,7 @@ def train_epoch(
 
         # NSELoss needs std of each basin for each sample
         else:
-            q_stds = q_stds.to(DEVICE)
+            q_stds = q_stds.to(cfg["device"])
             loss = loss_func(predictions, y, q_stds)
 
         # calculate gradients
@@ -531,11 +609,11 @@ def evaluate(user_cfg: Dict):
         dropout=run_cfg["dropout"],
         concat_static=run_cfg["concat_static"],
         no_static=run_cfg["no_static"],
-    ).to(DEVICE)
+    ).to(cfg["cfg"])
 
     # load trained model
     weight_file = user_cfg["run_dir"] / f"model_epoch{user_cfg['eval_epoch']}.pt"
-    model.load_state_dict(torch.load(weight_file, map_location=DEVICE))
+    model.load_state_dict(torch.load(weight_file, map_location=cfg["device"]))
 
     results = {}
     for basin in tqdm(basins):
@@ -543,7 +621,7 @@ def evaluate(user_cfg: Dict):
             ds_test = CamelsTXT(
                 camels_root=user_cfg["camels_root"],
                 basin=basin,
-                dates=[GLOBAL_SETTINGS["val_start"], GLOBAL_SETTINGS["val_end"]],
+                dates=[user_cfg["val_start"], user_cfg["val_end"]],
                 is_train=False,
                 seq_length=run_cfg["seq_length"],
                 with_attributes=True,
@@ -564,7 +642,8 @@ def evaluate(user_cfg: Dict):
         preds, obs = evaluate_basin(model, loader)
         try:
             df = pd.DataFrame(
-                data={"qobs": obs.flatten(), "qsim": preds.flatten()}, index=ds_test.dates_index[run_cfg["seq_length"]-1:]
+                data={"qobs": obs.flatten(), "qsim": preds.flatten()},
+                index=ds_test.dates_index[run_cfg["seq_length"] - 1 :],
             )
         except ValueError as e:
             tqdm.write(f"Skipped {basin} because of missing data")
@@ -601,11 +680,15 @@ def evaluate_basin(
         for data in loader:
             if len(data) == 2:
                 x, y = data
-                x, y = x.to(DEVICE), y.to(DEVICE)
+                x, y = x.to(cfg["device"]), y.to(cfg["device"])
                 p = model(x)[0]
             elif len(data) == 3:
                 x_d, x_s, y = data
-                x_d, x_s, y = x_d.to(DEVICE), x_s.to(DEVICE), y.to(DEVICE)
+                x_d, x_s, y = (
+                    x_d.to(cfg["device"]),
+                    x_s.to(cfg["device"]),
+                    y.to(cfg["device"]),
+                )
                 p = model(x_d, x_s[:, 0, :])[0]
 
             if preds is None:
@@ -621,8 +704,6 @@ def evaluate_basin(
         preds[preds < 0] = 0
 
     return preds, obs
-
-
 
 
 def _store_results(user_cfg: Dict, run_cfg: Dict, results: pd.DataFrame):
