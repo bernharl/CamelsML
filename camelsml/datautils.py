@@ -8,10 +8,16 @@ submitted to Hydrol. Earth Syst. Sci. Discussions (2019)
 You should have received a copy of the Apache-2.0 license along with the code. If not,
 see <https://opensource.org/licenses/Apache-2.0>
 """
+"""
+In compliance with the Apache-2.0 license I must inform that this file has been modified
+by Bernhard Nornes Lotsberg. The original code by Kratzert et. al can be found at 
+https://github.com/kratzert/ealstm_regional_modeling
+"""
+
 
 import sqlite3
 from pathlib import Path, PosixPath
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 import numpy as np
 import pandas as pd
@@ -195,7 +201,7 @@ def load_attributes(
     return df
 
 
-def normalize_features(feature: np.ndarray, variable: str) -> np.ndarray:
+def normalize_features(cfg: Dict,feature: np.ndarray, variable: str) -> np.ndarray:
     """Normalize features using global pre-computed statistics.
 
     Parameters
@@ -229,7 +235,7 @@ def normalize_features(feature: np.ndarray, variable: str) -> np.ndarray:
     return feature
 
 
-def rescale_features(feature: np.ndarray, variable: str) -> np.ndarray:
+def rescale_features(cfg: Dict, feature: np.ndarray, variable: str) -> np.ndarray:
     """Rescale features using global pre-computed statistics.
 
     Parameters
@@ -346,7 +352,6 @@ def load_forcing(
     df["Date"] = dates
     df.drop("date", axis=1, inplace=True)
     df.set_index("Date", inplace=True)
-    correct_scaler_inputs(df)
     return df, 1
 
 
@@ -378,9 +383,16 @@ def load_discharge(camels_root: Path, basin: str, area: int) -> pd.Series:
     df.fillna(0, inplace=True)
     df = pd.to_numeric(df)
 
-    correct_scaler_output(df)
     return df
 
+def get_timeseries_averages(cfg: Dict, basin_list: List):
+    sums = {}
+    timeseries_total_length = 0
+    for basin in basin_list:
+        forcing = load_forcing(cfg["camels_root"], basin=basin)
+        for column in forcing.columns:
+            print(column)
+        exit()        
 
 if __name__ == "__main__":
     # add_camels_attributes(camels_root="/home/bernhard/git/datasets_masters/camels_us/basin_dataset_public_v1p2", db_path="camels_us")
@@ -391,8 +403,7 @@ if __name__ == "__main__":
     forcing, area = load_forcing(
         camels_root="/home/bernhard/git/datasets_masters/camels_gb", basin=1001
     )
-    load_discharge(
-        camels_root="/home/bernhard/git/datasets_masters/camels_gb", area=1, basin=1001
-    )
-    print(SCALER)
+    #load_discharge(
+    #    camels_root="/home/bernhard/git/datasets_masters/camels_gb", area=1, basin=1001
+    #)
     # print(load_attributes(db_path="camels_us", basins=["01013500"]))

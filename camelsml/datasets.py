@@ -9,8 +9,9 @@ You should have received a copy of the Apache-2.0 license along with the code. I
 see <https://opensource.org/licenses/Apache-2.0>
 """
 
-from pathlib import PosixPath
-from typing import List, Tuple
+from pathlib import PosixPath, Path
+from typing import List, Tuple, Dict
+import pickle
 
 import h5py
 import numpy as np
@@ -18,13 +19,14 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
+import sklearn.preprocessing as sklpre
 
 from .datautils import (
     load_attributes,
     load_discharge,
     load_forcing,
-    normalize_features,
     reshape_data,
+    normalize_features,
 )
 
 
@@ -62,6 +64,7 @@ class CamelsTXT(Dataset):
         basin: str,
         dates: List,
         is_train: bool,
+        scaler_dir: Path,
         seq_length: int = 270,
         with_attributes: bool = False,
         attribute_means: pd.Series = None,
@@ -79,6 +82,9 @@ class CamelsTXT(Dataset):
         self.attribute_stds = attribute_stds
         self.concat_static = concat_static
         self.db_path = db_path
+        scaler_dir.mkdir(exist_ok=True)
+        self.x_scaler_path = scaler_dir / f"x_scaler_basin_{basin}.pickle"
+        self.y_scaler_path = scaler_dir / f"y_scaler_basin_{basin}.pickle"
 
         # placeholder to store std of discharge, used for rescaling losses during training
         self.q_std = None
@@ -87,7 +93,6 @@ class CamelsTXT(Dataset):
         self.period_start = None
         self.period_end = None
         self.attribute_names = None
-
         self.x, self.y = self._load_data()
         if self.with_attributes:
             self.attributes = self._load_attributes()
@@ -153,8 +158,8 @@ class CamelsTXT(Dataset):
 
             # store std of discharge before normalization
             self.q_std = np.std(y)
-
             y = normalize_features(y, variable="output")
+        
 
         # convert arrays to torch tensors
         x = torch.from_numpy(x.astype(np.float32))

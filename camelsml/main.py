@@ -14,6 +14,7 @@ import json
 import pickle
 import random
 import sys
+import warnings
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path, PosixPath
@@ -139,8 +140,6 @@ def get_args_remove_test() -> Dict:
         help="What epoch to evaluate",
     )
     cfg = vars(parser.parse_args())
-    # print(cfg["no_static"])
-    # exit()
     if cfg["cross_validation_run"]:
         raise NotImplementedError("Cross validation is not yet implemented.")
     # Validation checks
@@ -213,6 +212,10 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
         "hidden_size": int,
         "log_interval": int,
         "initial_forget_gate_bias": float,
+        "invalid_attr_file": Path,
+        "train_basin_file": Path,
+        "validation_basin_file": Path,
+        "test_basin_file": Path
     }
     cfg["num_workers"] = num_workers
     cfg["device"] = device
@@ -424,10 +427,10 @@ def train(cfg):
     torch.cuda.manual_seed(cfg["seed"])
     torch.manual_seed(cfg["seed"])
 
-    if cfg["split_train_test_folder"] is not None:
-        basins = get_basin_list(f"{cfg['split_train_test_folder']}/basins_train.txt")
-    else:
-        basins = get_basin_list()
+    try:
+        basins = get_basin_list(cfg["train_basin_file"])
+    except KeyError:
+        raise KeyError(f"train_basin_file not found in config file")
 
     # create folder structure for this run
     cfg = _setup_run(cfg)
@@ -569,25 +572,27 @@ def train_epoch(
         pbar.set_postfix_str(f"Loss: {loss.item():5f}")
 
 
-def evaluate(user_cfg: Dict):
+def evaluate(user_cfg: Dict, split: str="test"):
     """Train model for a single epoch.
 
     Parameters
     ----------
     user_cfg : Dict
         Dictionary containing the user entered evaluation config
+    split: str, ["train", "validation", "test"]
+        What part of the dataset to evaluate on.
 
     """
+    if not split in ["train", "validation", "test"]:
+        raise NotImplementedError(f"split must be either train, validation or test, not {split}")
     with open(user_cfg["run_dir"] / "cfg.json", "r") as fp:
         run_cfg = json.load(fp)
-
-    if user_cfg["split_train_test_folder"] is not None:
-        basins = get_basin_list(
-            f"{user_cfg['split_train_test_folder']}/basins_test.txt"
-        )
-    else:
-        basins = get_basin_list()
-
+    try:
+        if user_cfg["split_train_test_folder"] is not None:
+            basins = get_basin_list(user_cfg[f"{split}_basin_file"])
+    except KeyError:
+        raise KeyError(f"split it set to {split}, but that is not defined in your config.")
+    warnings.warn("WARNING: You have not made the train, validation and test dates work properly yet")
     # get attribute means/stds
     db_path = str(user_cfg["run_dir"] / "attributes.db")
     attributes = load_attributes(db_path=db_path, basins=basins, drop_lat_lon=True)
@@ -609,12 +614,12 @@ def evaluate(user_cfg: Dict):
         dropout=run_cfg["dropout"],
         concat_static=run_cfg["concat_static"],
         no_static=run_cfg["no_static"],
-    ).to(cfg["cfg"])
+    ).to(cfg["device"])
 
     # load trained model
     weight_file = user_cfg["run_dir"] / f"model_epoch{user_cfg['eval_epoch']}.pt"
     model.load_state_dict(torch.load(weight_file, map_location=cfg["device"]))
-
+    
     results = {}
     for basin in tqdm(basins):
         try:

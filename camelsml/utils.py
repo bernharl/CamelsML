@@ -53,7 +53,6 @@ def create_h5_files(
     """
     if out_file.is_file():
         raise FileExistsError(f"File already exists at {out_file}")
-
     with h5py.File(out_file, "w") as out_f:
         input_data = out_f.create_dataset(
             "input_data",
@@ -98,6 +97,7 @@ def create_h5_files(
                 is_train=True,
                 seq_length=seq_length,
                 dates=dates,
+                scaler_dir=out_file.parent / "scalers",
             )
 
             num_samples = len(dataset)
