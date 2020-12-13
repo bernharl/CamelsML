@@ -82,10 +82,7 @@ class CamelsTXT(Dataset):
         self.attribute_stds = attribute_stds
         self.concat_static = concat_static
         self.db_path = db_path
-        scaler_dir.mkdir(exist_ok=True)
-        self.x_scaler_path = scaler_dir / f"x_scaler_basin_{basin}.pickle"
-        self.y_scaler_path = scaler_dir / f"y_scaler_basin_{basin}.pickle"
-
+        self.scaler_dir = scaler_dir
         # placeholder to store std of discharge, used for rescaling losses during training
         self.q_std = None
 
@@ -141,7 +138,7 @@ class CamelsTXT(Dataset):
         y = np.array([df["QObs(mm/d)"].values]).T
 
         # normalize data, reshape for LSTM training and remove invalid samples
-        x = normalize_features(x, variable="inputs")
+        x = normalize_features(x, variable="inputs", scaler_dir=self.scaler_dir)
 
         x, y = reshape_data(x, y, self.seq_length)
 
@@ -158,8 +155,7 @@ class CamelsTXT(Dataset):
 
             # store std of discharge before normalization
             self.q_std = np.std(y)
-            y = normalize_features(y, variable="output")
-        
+            y = normalize_features(y, variable="output", scaler_dir=self.scaler_dir)
 
         # convert arrays to torch tensors
         x = torch.from_numpy(x.astype(np.float32))

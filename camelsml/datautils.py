@@ -79,21 +79,6 @@ INVALID_ATTR = [
 SCALER = {}
 
 
-def correct_scaler_inputs(df: pd.DataFrame):
-    means = df.drop(["Year", "Mnth", "Day", "Hr"], axis=1).mean(axis=0).to_numpy()
-    SCALER["input_means"] = means
-    stds = df.drop(["Year", "Mnth", "Day", "Hr"], axis=1).std(axis=0).to_numpy()
-
-
-def correct_scaler_output(df: pd.DataFrame):
-    mean = df.mean()
-    SCALER["output_mean"] = mean
-    std = df.std()
-    SCALER["output_std"] = std
-
-
-
-
 def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
     """Load catchment characteristics from txt files and store them in a sqlite3 table
 
@@ -201,7 +186,7 @@ def load_attributes(
     return df
 
 
-def normalize_features(cfg: Dict,feature: np.ndarray, variable: str) -> np.ndarray:
+def normalize_features(feature: np.ndarray, variable: str, scaler_dir) -> np.ndarray:
     """Normalize features using global pre-computed statistics.
 
     Parameters
@@ -223,19 +208,20 @@ def normalize_features(cfg: Dict,feature: np.ndarray, variable: str) -> np.ndarr
     RuntimeError
         If `variable` is neither 'inputs' nor 'output'
     """
-    # Temp before actually fixing scaling.
-    return feature
+    means = pd.read_csv(scaler_dir / "means_train.csv").drop("Unnamed: 0", axis=1)
+    stds = pd.read_csv(scaler_dir / "stds_train.csv").drop("Unnamed: 0", axis=1)
     if variable == "inputs":
-        feature = (feature - SCALER["input_means"]) / SCALER["input_stds"]
+        means = means.drop("discharge", axis=1).values
+        stds = stds.drop("discharge", axis=1).values
     elif variable == "output":
-        feature = (feature - SCALER["output_mean"]) / SCALER["output_std"]
+        means = means["discharge"].values
+        stds = stds["discharge"].values
     else:
         raise RuntimeError(f"Unknown variable type {variable}")
+    return (feature - means) / stds
 
-    return feature
 
-
-def rescale_features(cfg: Dict, feature: np.ndarray, variable: str) -> np.ndarray:
+def rescale_features(feature: np.ndarray, variable: str, scaler_dir) -> np.ndarray:
     """Rescale features using global pre-computed statistics.
 
     Parameters
@@ -258,16 +244,17 @@ def rescale_features(cfg: Dict, feature: np.ndarray, variable: str) -> np.ndarra
         If `variable` is neither 'inputs' nor 'output'
     """
     # Temp as well
-    return feature
+    means = pd.read_csv(scaler_dir / "means_train.csv").drop("Unnamed: 0", axis=1)
+    stds = pd.read_csv(scaler_dir / "stds_train.csv").drop("Unnamed: 0", axis=1)
     if variable == "inputs":
-        feature = feature * SCALER["input_stds"] + SCALER["input_means"]
+        means = means.drop("discharge", axis=1).values
+        stds = stds.drop("discharge", axis=1).values
     elif variable == "output":
-        feature = feature * SCALER["output_std"] + SCALER["output_mean"]
+        means = means["discharge"].values
+        stds = stds["discharge"].values
     else:
         raise RuntimeError(f"Unknown variable type {variable}")
-
-    return feature
-
+    return (feature * stds + means)
 
 @njit
 def reshape_data(
@@ -385,14 +372,6 @@ def load_discharge(camels_root: Path, basin: str, area: int) -> pd.Series:
 
     return df
 
-def get_timeseries_averages(cfg: Dict, basin_list: List):
-    sums = {}
-    timeseries_total_length = 0
-    for basin in basin_list:
-        forcing = load_forcing(cfg["camels_root"], basin=basin)
-        for column in forcing.columns:
-            print(column)
-        exit()        
 
 if __name__ == "__main__":
     # add_camels_attributes(camels_root="/home/bernhard/git/datasets_masters/camels_us/basin_dataset_public_v1p2", db_path="camels_us")

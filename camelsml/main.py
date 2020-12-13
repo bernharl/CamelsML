@@ -310,6 +310,7 @@ def _prepare_data(cfg: Dict, basins: List) -> Dict:
         dates=[cfg["train_start"], cfg["train_end"]],
         with_basin_str=True,
         seq_length=cfg["seq_length"],
+        scaler_dir=cfg["train_basin_file"].parent
     )
 
     return cfg
@@ -703,7 +704,7 @@ def evaluate_basin(
                 preds = torch.cat((preds, p.detach().cpu()), 0)
                 obs = torch.cat((obs, y.detach().cpu()), 0)
 
-        preds = rescale_features(preds.numpy(), variable="output")
+        preds = rescale_features(preds.numpy(), variable="output", cfg["train_basin_file"].parent)
         obs = obs.numpy()
         # set discharges < 0 to zero
         preds[preds < 0] = 0

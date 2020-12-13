@@ -26,6 +26,7 @@ def create_h5_files(
     out_file: PosixPath,
     basins: List,
     dates: List,
+    scaler_dir: Path,
     with_basin_str: bool = True,
     seq_length: int = 270,
 ):
@@ -97,7 +98,7 @@ def create_h5_files(
                 is_train=True,
                 seq_length=seq_length,
                 dates=dates,
-                scaler_dir=out_file.parent / "scalers",
+                scaler_dir=scaler_dir,
             )
 
             num_samples = len(dataset)
