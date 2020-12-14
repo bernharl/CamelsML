@@ -9,6 +9,7 @@ import pandas as pd
 from .utils import get_basin_list
 from .datautils import load_forcing, load_discharge
 
+
 def split_basins(
     camels_root: Union[str, Path],
     basin_list: Union[str, Path],
@@ -39,15 +40,19 @@ def split_basins(
         basins_test = basins[int(len(basins) * split[0]) :]
     else:
         basins_validation = basins[
-            int(len(basins) * split[0]) : int(len(basins) * split[1])
+            int(len(basins) * split[0]) : int(len(basins) * split[0])
+            + int(len(basins) * split[1])
         ]
-        basins_test = basins[int(len(basins) * split[1]) :]
+        basins_test = basins[
+            int(len(basins) * split[0]) + int(len(basins) * split[1]) :
+        ]
     np.savetxt(store_folder / "basins_test.txt", basins_test, fmt="%s")
     np.savetxt(store_folder / "basins_train.txt", basins_train, fmt="%s")
     if len(split) == 3:
         np.savetxt(store_folder / "basins_validation.txt", basins_validation, fmt="%s")
     if normalize:
         create_normalization_file(camels_root, store_folder / "basins_train.txt")
+
 
 def create_normalization_file(camels_root: Union[str, Path], train_basin_list: Path):
     basin_list = get_basin_list(train_basin_list)
@@ -59,23 +64,24 @@ def create_normalization_file(camels_root: Union[str, Path], train_basin_list: P
         forcing, _ = load_forcing(camels_root, basin)
         forcing = forcing.drop(ignore_columns, axis=1)
         discharge = load_discharge(camels_root, basin, _)
-        if i ==0:
+        if i == 0:
             mean = pd.DataFrame(mean, columns=forcing.columns)
             mean["discharge"] = np.array([0])
             mean_squared = pd.DataFrame(mean_squared, columns=forcing.columns)
             mean_squared["discharge"] = np.array([0])
         tmp_mean = forcing.sum(axis=0)
-        tmp_mean_squared = (forcing**2).sum(axis=0)
+        tmp_mean_squared = (forcing ** 2).sum(axis=0)
         tmp_mean["discharge"] = discharge.sum()
-        tmp_mean_squared["discharge"] = (discharge**2).sum()
+        tmp_mean_squared["discharge"] = (discharge ** 2).sum()
         mean += tmp_mean
         mean_squared += tmp_mean_squared
         length += len(forcing)
     mean = mean / length
     mean_squared = mean_squared / length
-    std = np.sqrt(mean_squared - mean**2)
+    std = np.sqrt(mean_squared - mean ** 2)
     mean.to_csv(train_basin_list.parent / "means_train.csv")
     std.to_csv(train_basin_list.parent / "stds_train.csv")
-    
+
+
 if __name__ == "__main__":
-    split_basins("data/basin_list.txt", [0.65, 0.1, 0.25],  "data/split", 1010)
+    split_basins("data/basin_list.txt", [0.65, 0.1, 0.25], "data/split", 1010)
