@@ -18,7 +18,7 @@ import warnings
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path, PosixPath
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Optional
 
 import numpy as np
 import pandas as pd
@@ -74,99 +74,6 @@ from .utils import create_h5_files, get_basin_list
 ###############
 
 
-def get_args_remove_test() -> Dict:
-    """Parse input arguments
-
-    Returns
-    -------
-    dict
-        Dictionary containing the run config.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["train", "evaluate", "eval_robustness"])
-    parser.add_argument(
-        "--camels_root", type=str, help="Root directory of CAMELS data set"
-    )
-    parser.add_argument("--seed", type=int, required=False, help="Random seed")
-    parser.add_argument(
-        "--run_dir", type=str, help="For evaluation mode. Path to run directory."
-    )
-    parser.add_argument(
-        "--cache_data",
-        type=bool,
-        default=False,
-        help="If True, loads all data into memory",
-    )
-    parser.add_argument(
-        "--num_workers",
-        type=int,
-        default=12,
-        help="Number of parallel threads for data loading",
-    )
-    parser.add_argument(
-        "--no_static",
-        type=bool,
-        default=False,
-        help="If True, trains LSTM without static features",
-    )
-    parser.add_argument(
-        "--concat_static",
-        type=bool,
-        default=False,
-        help="If True, train LSTM with static feats concatenated at each time step",
-    )
-    parser.add_argument(
-        "--use_mse",
-        type=bool,
-        default=False,
-        help="If True, uses mean squared error as loss function.",
-    )
-    parser.add_argument(
-        "--split_train_test_folder",
-        type=str,
-        default=None,
-        help="If defined, the training will only train on the train split in the folder, while evaluation will only happen on the test state",
-    )
-    parser.add_argument(
-        "--cross_validation_run",
-        type=bool,
-        default=False,
-        help="NOT IMPLEMENTED. Whether to use cross validation.",
-    )
-    parser.add_argument(
-        "--eval_epoch",
-        type=int,
-        default=GLOBAL_SETTINGS["epochs"],
-        help="What epoch to evaluate",
-    )
-    cfg = vars(parser.parse_args())
-    if cfg["cross_validation_run"]:
-        raise NotImplementedError("Cross validation is not yet implemented.")
-    # Validation checks
-    if (cfg["mode"] == "train") and (cfg["seed"] is None):
-        # generate random seed for this run
-        cfg["seed"] = int(np.random.uniform(low=0, high=1e6))
-
-    if (cfg["mode"] in ["evaluate", "eval_robustness"]) and (cfg["run_dir"] is None):
-        raise ValueError(
-            "In evaluation mode a run directory (--run_dir) has to be specified"
-        )
-
-    # combine global settings with user config
-    cfg.update(GLOBAL_SETTINGS)
-
-    if cfg["mode"] == "train":
-        # print config to terminal
-        for key, val in cfg.items():
-            print(f"{key}: {val}")
-
-    # convert path to PosixPath object
-    cfg["camels_root"] = Path(cfg["camels_root"])
-    if cfg["run_dir"] is not None:
-        cfg["run_dir"] = Path(cfg["run_dir"])
-    return cfg
-
-
 def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> Dict:
     if not isinstance(cfg_file, Path):
         try:
@@ -214,8 +121,9 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
         "initial_forget_gate_bias": float,
         "invalid_attr_file": Path,
         "train_basin_file": Path,
-        "validation_basin_file": Path,
-        "test_basin_file": Path
+        "val_basin_file": Path,
+        "test_basin_file": Path,
+        "evaluate_on_epoch": bool_type,
     }
     cfg["num_workers"] = num_workers
     cfg["device"] = device
@@ -310,7 +218,7 @@ def _prepare_data(cfg: Dict, basins: List) -> Dict:
         dates=[cfg["train_start"], cfg["train_end"]],
         with_basin_str=True,
         seq_length=cfg["seq_length"],
-        scaler_dir=cfg["train_basin_file"].parent
+        scaler_dir=cfg["train_basin_file"].parent,
     )
 
     return cfg
@@ -489,6 +397,11 @@ def train(cfg):
 
         model_path = cfg["run_dir"] / f"model_epoch{epoch}.pt"
         torch.save(model.state_dict(), str(model_path))
+        if cfg["evaluate_on_epoch"]:
+            model = model.to("cpu")
+            tqdm.write(f"Validating epoch {epoch}")
+            evaluate(user_cfg=cfg, split="val", epoch=epoch)
+            model = model.to(cfg["device"])
 
 
 def train_epoch(
@@ -573,8 +486,8 @@ def train_epoch(
         pbar.set_postfix_str(f"Loss: {loss.item():5f}")
 
 
-def evaluate(user_cfg: Dict, split: str="test"):
-    """Train model for a single epoch.
+def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None):
+    """
 
     Parameters
     ----------
@@ -584,16 +497,18 @@ def evaluate(user_cfg: Dict, split: str="test"):
         What part of the dataset to evaluate on.
 
     """
-    if not split in ["train", "validation", "test"]:
-        raise NotImplementedError(f"split must be either train, validation or test, not {split}")
+    if not split in ["train", "val", "test"]:
+        raise NotImplementedError(
+            f"split must be either train, val or test, not {split}"
+        )
     with open(user_cfg["run_dir"] / "cfg.json", "r") as fp:
         run_cfg = json.load(fp)
     try:
-        if user_cfg["split_train_test_folder"] is not None:
-            basins = get_basin_list(user_cfg[f"{split}_basin_file"])
+        basins = get_basin_list(user_cfg[f"{split}_basin_file"])
     except KeyError:
-        raise KeyError(f"split it set to {split}, but that is not defined in your config.")
-    warnings.warn("WARNING: You have not made the train, validation and test dates work properly yet")
+        raise KeyError(
+            f"split it set to {split}, but that is not defined in your config."
+        )
     # get attribute means/stds
     db_path = str(user_cfg["run_dir"] / "attributes.db")
     attributes = load_attributes(db_path=db_path, basins=basins, drop_lat_lon=True)
@@ -615,19 +530,21 @@ def evaluate(user_cfg: Dict, split: str="test"):
         dropout=run_cfg["dropout"],
         concat_static=run_cfg["concat_static"],
         no_static=run_cfg["no_static"],
-    ).to(cfg["device"])
+    ).to(user_cfg["device"])
 
     # load trained model
-    weight_file = user_cfg["run_dir"] / f"model_epoch{user_cfg['eval_epoch']}.pt"
-    model.load_state_dict(torch.load(weight_file, map_location=cfg["device"]))
-    
+    if epoch is None:
+        epoch = cfg["epochs"]
+    weight_file = user_cfg["run_dir"] / f"model_epoch{epoch}.pt"
+    model.load_state_dict(torch.load(weight_file, map_location=user_cfg["device"]))
+
     results = {}
     for basin in tqdm(basins):
         try:
             ds_test = CamelsTXT(
                 camels_root=user_cfg["camels_root"],
                 basin=basin,
-                dates=[user_cfg["val_start"], user_cfg["val_end"]],
+                dates=[user_cfg[f"{split}_start"], user_cfg[f"{split}_end"]],
                 is_train=False,
                 seq_length=run_cfg["seq_length"],
                 with_attributes=True,
@@ -635,6 +552,7 @@ def evaluate(user_cfg: Dict, split: str="test"):
                 attribute_stds=stds,
                 concat_static=run_cfg["concat_static"],
                 db_path=db_path,
+                scaler_dir=user_cfg["train_basin_file"].parent,
             )
         except ValueError as e:
             # raise e
@@ -645,7 +563,7 @@ def evaluate(user_cfg: Dict, split: str="test"):
             tqdm.write(f"Skipped {basin} because 0 length")
             continue
         loader = DataLoader(ds_test, batch_size=1024, shuffle=False, num_workers=4)
-        preds, obs = evaluate_basin(model, loader)
+        preds, obs = evaluate_basin(model, loader, user_cfg)
         try:
             df = pd.DataFrame(
                 data={"qobs": obs.flatten(), "qsim": preds.flatten()},
@@ -655,12 +573,11 @@ def evaluate(user_cfg: Dict, split: str="test"):
             tqdm.write(f"Skipped {basin} because of missing data")
             continue
         results[basin] = df
-    print(f"Saved {len(results)} basins")
-    _store_results(user_cfg, run_cfg, results)
+    _store_results(user_cfg, run_cfg, results, epoch)
 
 
 def evaluate_basin(
-    model: nn.Module, loader: DataLoader
+    model: nn.Module, loader: DataLoader, user_cfg: Dict
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Evaluate model on a single basin
 
@@ -686,14 +603,14 @@ def evaluate_basin(
         for data in loader:
             if len(data) == 2:
                 x, y = data
-                x, y = x.to(cfg["device"]), y.to(cfg["device"])
+                x, y = x.to(user_cfg["device"]), y.to(user_cfg["device"])
                 p = model(x)[0]
             elif len(data) == 3:
                 x_d, x_s, y = data
                 x_d, x_s, y = (
-                    x_d.to(cfg["device"]),
-                    x_s.to(cfg["device"]),
-                    y.to(cfg["device"]),
+                    x_d.to(user_cfg["device"]),
+                    x_s.to(user_cfg["device"]),
+                    y.to(user_cfg["device"]),
                 )
                 p = model(x_d, x_s[:, 0, :])[0]
 
@@ -704,7 +621,11 @@ def evaluate_basin(
                 preds = torch.cat((preds, p.detach().cpu()), 0)
                 obs = torch.cat((obs, y.detach().cpu()), 0)
 
-        preds = rescale_features(preds.numpy(), variable="output", cfg["train_basin_file"].parent)
+        preds = rescale_features(
+            preds.numpy(),
+            variable="output",
+            scaler_dir=user_cfg["train_basin_file"].parent,
+        )
         obs = obs.numpy()
         # set discharges < 0 to zero
         preds[preds < 0] = 0
@@ -712,7 +633,7 @@ def evaluate_basin(
     return preds, obs
 
 
-def _store_results(user_cfg: Dict, run_cfg: Dict, results: pd.DataFrame):
+def _store_results(user_cfg: Dict, run_cfg: Dict, results: pd.DataFrame, epoch: int):
     """Store results in a pickle file.
 
     Parameters
@@ -726,12 +647,19 @@ def _store_results(user_cfg: Dict, run_cfg: Dict, results: pd.DataFrame):
 
     """
     if run_cfg["no_static"]:
-        file_name = user_cfg["run_dir"] / f"lstm_no_static_seed{run_cfg['seed']}.p"
+        file_name = (
+            user_cfg["run_dir"]
+            / f"lstm_no_static_seed{run_cfg['seed']}_epoch_{epoch}.p"
+        )
     else:
         if run_cfg["concat_static"]:
-            file_name = user_cfg["run_dir"] / f"lstm_seed{run_cfg['seed']}.p"
+            file_name = (
+                user_cfg["run_dir"] / f"lstm_seed{run_cfg['seed']}_epoch_{epoch}.p"
+            )
         else:
-            file_name = user_cfg["run_dir"] / f"ealstm_seed{run_cfg['seed']}.p"
+            file_name = (
+                user_cfg["run_dir"] / f"ealstm_seed{run_cfg['seed']}_epoch_{epoch}.p"
+            )
 
     with (file_name).open("wb") as fp:
         pickle.dump(results, fp)
