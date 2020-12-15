@@ -40,34 +40,6 @@ from .metrics import calc_nse
 from .nseloss import NSELoss
 from .utils import create_h5_files, get_basin_list
 
-###########
-# Globals #
-###########
-
-# fixed settings for all experiments
-"""GLOBAL_SETTINGS = {
-    "batch_size": 1536,
-    "clip_norm": True,
-    "clip_value": 1,
-    "dropout": 0.4,
-    "epochs": 30,
-    "hidden_size": 256,
-    "initial_forget_gate_bias": 5,
-    "log_interval": 50,
-    "learning_rate": 1e-3,
-    "seq_length": 270,
-    # "train_start": pd.to_datetime("01101971", format="%d%m%Y"),
-    # When to start?
-    "train_start": pd.to_datetime("01101988", format="%d%m%Y"),
-    "train_end": pd.to_datetime("30092015", format="%d%m%Y"),
-    "val_start": pd.to_datetime("01101971", format="%d%m%Y"),
-    # "val_start": pd.to_datetime("01101979", format="%d%m%Y"),
-    # "val_end": pd.to_datetime("30091988", format="%d%m%Y"),
-    "val_end": pd.to_datetime("30092015", format="%d%m%Y"),
-}"""
-
-# check if GPU is available
-# DEVICE = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
 ###############
 # Prepare run #
@@ -124,6 +96,7 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
         "val_basin_file": Path,
         "test_basin_file": Path,
         "evaluate_on_epoch": bool_type,
+        "attribute_selection_file": Path,
     }
     cfg["num_workers"] = num_workers
     cfg["device"] = device
@@ -340,7 +313,12 @@ def train(cfg):
         basins = get_basin_list(cfg["train_basin_file"])
     except KeyError:
         raise KeyError(f"train_basin_file not found in config file")
-
+    if "attribute_selection_file" in cfg.keys():
+        attribute_selection = np.genfromtxt(
+            cfg["attribute_selection_file"], dtype="str"
+        )
+    else:
+        attribute_selection = None
     # create folder structure for this run
     cfg = _setup_run(cfg)
 
@@ -354,6 +332,7 @@ def train(cfg):
         concat_static=cfg["concat_static"],
         cache=cfg["cache_data"],
         no_static=cfg["no_static"],
+        attribute_selection=attribute_selection,
     )
     input_size_dyn = ds[0][0].size()[1]
     if cfg["no_static"] or cfg["concat_static"]:
@@ -501,6 +480,13 @@ def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None):
         raise NotImplementedError(
             f"split must be either train, val or test, not {split}"
         )
+    if "attribute_selection_file" in user_cfg.keys():
+        attribute_selection = np.genfromtxt(
+            user_cfg["attribute_selection_file"], dtype="str"
+        )
+        tqdm.write(f"Using {len(attribute_selection)} static features")
+    else:
+        attribute_selection = None
     with open(user_cfg["run_dir"] / "cfg.json", "r") as fp:
         run_cfg = json.load(fp)
     try:
@@ -511,9 +497,20 @@ def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None):
         )
     # get attribute means/stds
     db_path = str(user_cfg["run_dir"] / "attributes.db")
-    attributes = load_attributes(db_path=db_path, basins=basins, drop_lat_lon=True)
-    means = attributes.mean()
-    stds = attributes.std()
+    attributes = load_attributes(
+        db_path=db_path, basins=basins, keep_features=attribute_selection
+    )
+    if split == "train":
+        means = attributes.mean()
+        stds = attributes.std()
+    else:
+        attributes_train = load_attributes(
+            db_path=db_path,
+            basins=get_basin_list(user_cfg["train_basin_file"]),
+            keep_features=attribute_selection,
+        )
+        means = attributes_train.mean()
+        stds = attributes_train.std()
     attrs_count = len(attributes.columns)
     timeseries_count = 6
     # create model
@@ -534,7 +531,7 @@ def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None):
 
     # load trained model
     if epoch is None:
-        epoch = cfg["epochs"]
+        epoch = user_cfg["epochs"]
     weight_file = user_cfg["run_dir"] / f"model_epoch{epoch}.pt"
     model.load_state_dict(torch.load(weight_file, map_location=user_cfg["device"]))
 
@@ -553,6 +550,7 @@ def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None):
                 concat_static=run_cfg["concat_static"],
                 db_path=db_path,
                 scaler_dir=user_cfg["train_basin_file"].parent,
+                attribute_selection=attribute_selection,
             )
         except ValueError as e:
             # raise e

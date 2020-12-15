@@ -10,7 +10,7 @@ see <https://opensource.org/licenses/Apache-2.0>
 """
 
 from pathlib import PosixPath, Path
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional, Union
 import pickle
 
 import h5py
@@ -71,6 +71,7 @@ class CamelsTXT(Dataset):
         attribute_stds: pd.Series = None,
         concat_static: bool = False,
         db_path: str = None,
+        attribute_selection: Optional[Union[np.ndarray, List]] = None,
     ):
         self.camels_root = camels_root
         self.basin = basin
@@ -83,6 +84,7 @@ class CamelsTXT(Dataset):
         self.concat_static = concat_static
         self.db_path = db_path
         self.scaler_dir = scaler_dir
+        self.attribute_selection = attribute_selection
         # placeholder to store std of discharge, used for rescaling losses during training
         self.q_std = None
 
@@ -164,7 +166,7 @@ class CamelsTXT(Dataset):
         return x, y
 
     def _load_attributes(self) -> torch.Tensor:
-        df = load_attributes(self.db_path, [self.basin], drop_lat_lon=True)
+        df = load_attributes(self.db_path, [self.basin], drop_lat_lon=True, keep_features=self.attribute_selection)
 
         # normalize data
         df = (df - self.attribute_means) / self.attribute_stds
@@ -208,6 +210,7 @@ class CamelsH5(Dataset):
         concat_static: bool = False,
         cache: bool = False,
         no_static: bool = False,
+        attribute_selection: Optional[Union[np.ndarray, List]] = None,
     ):
         self.h5_file = h5_file
         self.basins = basins
@@ -215,6 +218,7 @@ class CamelsH5(Dataset):
         self.concat_static = concat_static
         self.cache = cache
         self.no_static = no_static
+        self.attribute_selection = attribute_selection
 
         # Placeholder for catchment attributes stats
         self.df = None
@@ -296,9 +300,8 @@ class CamelsH5(Dataset):
         return basins
 
     def _load_attributes(self):
-        df = load_attributes(self.db_path, self.basins, drop_lat_lon=True)
+        df = load_attributes(self.db_path, self.basins, drop_lat_lon=True, keep_features=self.attribute_selection)
         # store means and stds
-        # Not normalizing now, need to make it work first
         self.attribute_means = df.mean()
         self.attribute_stds = df.std()
 
