@@ -97,6 +97,8 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
         "test_basin_file": Path,
         "evaluate_on_epoch": bool_type,
         "attribute_selection_file": Path,
+        "early_stopping": bool_type,
+        "early_stopping_steps": int,
     }
     cfg["num_workers"] = num_workers
     cfg["device"] = device
@@ -116,6 +118,12 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
                 raise NotImplementedError(
                     f"No functionality for setting {key} implemented"
                 )
+    if cfg["evaluate_on_epoch"] == False and cfg["early_stopping"] == True:
+        warnings.warn(
+            "Cannot do early stopping without evaluating each epoch,\n"
+            + "setting evaluate_on_epoch to True"
+        )
+        cfg["evaluate_on_epoch"] = True
     return cfg
 
 
@@ -362,7 +370,9 @@ def train(cfg):
         loss_func = nn.MSELoss()
     else:
         loss_func = NSELoss()
-
+    if cfg["early_stopping"]:
+        latest_criterions = [-np.inf for i in range(cfg["early_stopping_steps"])]
+        prev_criterions = [-np.inf for i in range(cfg["early_stopping_steps"])]
     # reduce learning rates after each 10 epochs
     learning_rates = {11: 5e-4, 21: 1e-4}
 
@@ -379,7 +389,24 @@ def train(cfg):
         if cfg["evaluate_on_epoch"]:
             model = model.to("cpu")
             tqdm.write(f"Validating epoch {epoch}")
-            evaluate(user_cfg=cfg, split="val", epoch=epoch)
+            nse_values = evaluate(user_cfg=cfg, split="val", epoch=epoch)
+            if cfg["early_stopping"]:
+                for i in range(cfg["early_stopping_steps"] - 1):
+                    prev_criterions[-(i + 2)] = prev_criterions[-(i + 1)]
+                prev_criterions[-1] = latest_criterions[0]
+                for i in range(cfg["early_stopping_steps"] - 1):
+                    latest_criterions[-(i + 2)] = latest_criterions[-(i + 1)]
+                # Discuss this criterion with Felix and Simon!
+                latest_criterions[-1] = np.median(np.array(list(nse_values.values())))
+                if np.mean(latest_criterions) < np.mean(prev_criterions):
+                    tqdm.write(f"Early stopping criterion reached at epoch {epoch}")
+                    break
+                else:
+                    tqdm.write(
+                        f"Early stopping not satisfied, continuing. "
+                        + f"Prev {cfg['early_stopping_steps']}: {np.mean(latest_criterions)}, prev before that: {np.mean(prev_criterions)}"
+                    )
+
             model = model.to(cfg["device"])
 
 
@@ -465,7 +492,7 @@ def train_epoch(
         pbar.set_postfix_str(f"Loss: {loss.item():5f}")
 
 
-def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None):
+def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None) -> Dict:
     """
 
     Parameters
@@ -536,6 +563,7 @@ def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None):
     model.load_state_dict(torch.load(weight_file, map_location=user_cfg["device"]))
 
     results = {}
+    nse_values = {}
     for basin in tqdm(basins):
         try:
             ds_test = CamelsTXT(
@@ -571,7 +599,10 @@ def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None):
             tqdm.write(f"Skipped {basin} because of missing data")
             continue
         results[basin] = df
+        nse_values[basin] = calc_nse(obs, preds)
+        # print(nse_values[basin])
     _store_results(user_cfg, run_cfg, results, epoch)
+    return nse_values
 
 
 def evaluate_basin(

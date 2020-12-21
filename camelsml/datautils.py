@@ -73,10 +73,11 @@ INVALID_ATTR = [
     "conductivity_hypres_missing",
     "root_depth_missing",
     "soil_depth_pelletier_missing",
+    # Discussion monday 21st
+    # "gauge_latitude",
+    # "gauge_longitude",
 ]
 
-# Maurer mean/std calculated over all basins in period 01.10.1999 until 30.09.2008
-SCALER = {}
 
 
 def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
