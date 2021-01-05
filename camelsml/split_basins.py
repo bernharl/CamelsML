@@ -54,6 +54,46 @@ def split_basins(
         create_normalization_file(camels_root, store_folder / "basins_train.txt")
 
 
+def cross_validation_split(
+    camels_root: Union[str, Path],
+    basin_list: Union[str, Path],
+    k: int,
+    test_split: float,
+    store_folder: Union[str, Path],
+    seed: int,
+    normalize: bool = True,
+):
+    if isinstance(basin_list, str):
+        basin_list = Path(basin_list)
+    elif not isinstance(basin_list, Path):
+        raise TypeError(f"basin_list must be Path or str, not {type(basin_list)}")
+    if isinstance(store_folder, str):
+        store_folder = Path(store_folder)
+    elif not isinstance(store_folder, Path):
+        raise TypeError(f"basin_list must be Path or str, not {type(basin_list)}")
+    store_folder = store_folder / f"cross_validation_seed_{seed}"
+    store_folder.mkdir(parents=True, exist_ok=True)
+    np.random.seed(seed)
+    basins = np.loadtxt(basin_list, dtype="str")
+    np.random.shuffle(basins)
+    basins_test = basins[: int(len(basins) * test_split)]
+    basins = basins[int(len(basins) * test_split) :]
+    basins_split = np.array_split(basins, k)
+    np.savetxt(store_folder / "basins_test.txt", basins_test, fmt="%s")
+    for i, basins_val in enumerate(basins_split):
+        split_folder = store_folder / f"{i}"
+        split_folder.mkdir(parents=True, exist_ok=True)
+        basins_train = np.delete(basins_split, i)
+        basins_train_list = []
+        for sub_split in basins_train:
+            basins_train_list.extend(list(sub_split))
+        basins_train = np.array(basins_train_list, dtype=object)
+        del basins_train_list
+        np.savetxt(split_folder / "basins_val.txt", basins_val, fmt="%s")
+        np.savetxt(split_folder / "basins_train.txt", basins_train, fmt="%s")
+        create_normalization_file(camels_root, split_folder / "basins_train.txt")
+
+
 def create_normalization_file(camels_root: Union[str, Path], train_basin_list: Path):
     basin_list = get_basin_list(train_basin_list)
     ignore_columns = np.array(["Year", "Mnth", "Day", "Hr"])

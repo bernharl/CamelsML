@@ -108,7 +108,8 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
                 continue
             for i, sign in enumerate(line):
                 if sign == "#":
-                    line = line[:i]
+                    line = line[:i] + line[-1]
+                    break
             line = line.split(": ")
             key = line[0]
             value = line[1][:-1]
@@ -118,6 +119,12 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
                 raise NotImplementedError(
                     f"No functionality for setting {key} implemented"
                 )
+            except ValueError:
+                raise ValueError(f"Error parsing '{line}', '{key}', '{value}'")
+    if "evaluate_on_epoch" not in cfg.keys():
+        cfg["evaluate_on_epoch"] = False
+    if "early_stopping" not in cfg.keys():
+        cfg["early_stopping"] = False
     if cfg["evaluate_on_epoch"] == False and cfg["early_stopping"] == True:
         warnings.warn(
             "Cannot do early stopping without evaluating each epoch,\n"
@@ -392,19 +399,25 @@ def train(cfg):
             nse_values = evaluate(user_cfg=cfg, split="val", epoch=epoch)
             if cfg["early_stopping"]:
                 for i in range(cfg["early_stopping_steps"] - 1):
-                    prev_criterions[-(i + 2)] = prev_criterions[-(i + 1)]
+                    prev_criterions[i] = prev_criterions[i + 1]
                 prev_criterions[-1] = latest_criterions[0]
                 for i in range(cfg["early_stopping_steps"] - 1):
-                    latest_criterions[-(i + 2)] = latest_criterions[-(i + 1)]
+                    latest_criterions[i] = latest_criterions[i + 1]
                 # Discuss this criterion with Felix and Simon!
-                latest_criterions[-1] = np.median(np.array(list(nse_values.values())))
+                # latest_criterions[-1] = np.median(np.array(list(nse_values.values())))
+                good_model = 0.7
+                nse_values = np.array(list(nse_values.values()))
+                latest_criterions[-1] = len(nse_values[nse_values > good_model]) / len(
+                    nse_values
+                )
                 if np.mean(latest_criterions) < np.mean(prev_criterions):
                     tqdm.write(f"Early stopping criterion reached at epoch {epoch}")
                     break
                 else:
                     tqdm.write(
                         f"Early stopping not satisfied, continuing. "
-                        + f"Prev {cfg['early_stopping_steps']}: {np.mean(latest_criterions)}, prev before that: {np.mean(prev_criterions)}"
+                        + f"Prev {cfg['early_stopping_steps']}: {np.mean(latest_criterions)}, "
+                        + f"prev before that: {np.mean(prev_criterions)}"
                     )
 
             model = model.to(cfg["device"])
@@ -588,7 +601,9 @@ def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None) -
             # raise e
             tqdm.write(f"Skipped {basin} because 0 length")
             continue
-        loader = DataLoader(ds_test, batch_size=1024, shuffle=False, num_workers=4)
+        loader = DataLoader(
+            ds_test, batch_size=user_cfg["batch_size"], shuffle=False, num_workers=user_cfg["num_workers"]
+        )
         preds, obs = evaluate_basin(model, loader, user_cfg)
         try:
             df = pd.DataFrame(
