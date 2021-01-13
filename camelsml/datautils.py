@@ -79,7 +79,6 @@ INVALID_ATTR = [
 ]
 
 
-
 def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
     """Load catchment characteristics from txt files and store them in a sqlite3 table
 
@@ -97,8 +96,7 @@ def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
         If CAMELS attributes folder could not be found.
     """
     attributes_path = (
-        Path(camels_root)
-        / "catalogue.ceh.ac.uk/datastore/eidchub/8344e4f3-d2ea-44f5-8afa-86d2987543a9/"
+        Path(camels_root) / "8344e4f3-d2ea-44f5-8afa-86d2987543a9" / "data"
     )
 
     if not attributes_path.exists():
@@ -255,7 +253,8 @@ def rescale_features(feature: np.ndarray, variable: str, scaler_dir) -> np.ndarr
         stds = stds["discharge"].values
     else:
         raise RuntimeError(f"Unknown variable type {variable}")
-    return (feature * stds + means)
+    return feature * stds + means
+
 
 @njit
 def reshape_data(
@@ -307,10 +306,8 @@ def load_forcing(
         raise ValueError(f"camels_root must be Path or str, not {type(camels_root)}")
     path = (
         camels_root
-        / "catalogue.ceh.ac.uk"
-        / "datastore"
-        / "eidchub"
         / "8344e4f3-d2ea-44f5-8afa-86d2987543a9"
+        / "data"
         / "timeseries"
         / f"CAMELS_GB_hydromet_timeseries_{basin}_19701001-20150930.csv"
     )
@@ -357,10 +354,8 @@ def load_discharge(camels_root: Path, basin: str, area: int) -> pd.Series:
         raise ValueError(f"camels_root must be Path or str, not {type(camels_root)}")
     discharge_path = (
         camels_root
-        / "catalogue.ceh.ac.uk"
-        / "datastore"
-        / "eidchub"
         / "8344e4f3-d2ea-44f5-8afa-86d2987543a9"
+        / "data"
         / "timeseries"
         / f"CAMELS_GB_hydromet_timeseries_{basin}_19701001-20150930.csv"
     )
@@ -383,7 +378,7 @@ if __name__ == "__main__":
     forcing, area = load_forcing(
         camels_root="/home/bernhard/git/datasets_masters/camels_gb", basin=1001
     )
-    #load_discharge(
+    # load_discharge(
     #    camels_root="/home/bernhard/git/datasets_masters/camels_gb", area=1, basin=1001
-    #)
+    # )
     # print(load_attributes(db_path="camels_us", basins=["01013500"]))
