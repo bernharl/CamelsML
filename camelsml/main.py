@@ -110,9 +110,12 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
                 if sign == "#":
                     line = line[:i] + line[-1]
                     break
-            line = line.split(": ")
-            key = line[0]
-            value = line[1][:-1]
+            try:
+                line = line.split(": ")
+                key = line[0]
+                value = line[1][:-1]
+            except IndexError:
+                raise IndexError(f"Unable to parse line {line}")
             try:
                 cfg[key] = types[key](value)
             except KeyError:
