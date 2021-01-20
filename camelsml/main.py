@@ -508,7 +508,14 @@ def train_epoch(
         pbar.set_postfix_str(f"Loss: {loss.item():5f}")
 
 
-def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None) -> Dict:
+def evaluate(
+    user_cfg: Dict,
+    split: str = "test",
+    epoch: Optional[int] = None,
+    save_dir: Optional[Path] = None,
+    store: bool = True,
+    permutate_feature: str = None,
+) -> Dict:
     """
 
     Parameters
@@ -557,6 +564,7 @@ def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None) -
     attrs_count = len(attributes.columns)
     timeseries_count = 6
     # create model
+    # NOTE: Check this more thoroughly later, could be a bug with concat_static=True
     input_size_stat = timeseries_count if run_cfg["no_static"] else attrs_count
     input_size_dyn = (
         timeseries_count
@@ -588,13 +596,15 @@ def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None) -
                 dates=[user_cfg[f"{split}_start"], user_cfg[f"{split}_end"]],
                 is_train=False,
                 seq_length=run_cfg["seq_length"],
-                with_attributes=True,
+                # This SHOULD be more correct
+                with_attributes=not run_cfg["no_static"],
                 attribute_means=means,
                 attribute_stds=stds,
                 concat_static=run_cfg["concat_static"],
                 db_path=db_path,
                 scaler_dir=user_cfg["train_basin_file"].parent,
                 attribute_selection=attribute_selection,
+                permutate_feature=permutate_feature,
             )
         except ValueError as e:
             # raise e
@@ -605,7 +615,10 @@ def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None) -
             tqdm.write(f"Skipped {basin} because 0 length")
             continue
         loader = DataLoader(
-            ds_test, batch_size=user_cfg["batch_size"], shuffle=False, num_workers=user_cfg["num_workers"]
+            ds_test,
+            batch_size=user_cfg["batch_size"],
+            shuffle=False,
+            num_workers=user_cfg["num_workers"],
         )
         preds, obs = evaluate_basin(model, loader, user_cfg)
         try:
@@ -619,7 +632,8 @@ def evaluate(user_cfg: Dict, split: str = "test", epoch: Optional[int] = None) -
         results[basin] = df
         nse_values[basin] = calc_nse(obs, preds)
         # print(nse_values[basin])
-    _store_results(user_cfg, run_cfg, results, epoch)
+    if store:
+        _store_results(user_cfg, run_cfg, results, epoch)
     return nse_values
 
 

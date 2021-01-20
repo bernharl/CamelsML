@@ -144,6 +144,7 @@ def load_attributes(
     basins: List[str],
     drop_lat_lon: bool = True,
     keep_features: List = None,
+    permutate_feature: str = None,
 ) -> pd.DataFrame:
     """Load attributes from database file into DataFrame
 
@@ -169,6 +170,9 @@ def load_attributes(
         df = pd.read_sql("SELECT * FROM 'basin_attributes'", conn, index_col="gauge_id")
     # drop rows of basins not contained in data set
     drop_basins = [b for b in df.index if str(b) not in basins]
+    # Permutate before dropping other basins
+    if permutate_feature is not None:
+        df[permutate_feature] = df[permutate_feature].sample(frac=1).to_numpy()
     # return drop_basins, df
     df = df.drop(drop_basins, axis=0)
     # drop lat/lon col

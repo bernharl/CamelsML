@@ -72,6 +72,7 @@ class CamelsTXT(Dataset):
         concat_static: bool = False,
         db_path: str = None,
         attribute_selection: Optional[Union[np.ndarray, List]] = None,
+        permutate_feature: Optional[str] = None,
     ):
         self.camels_root = camels_root
         self.basin = basin
@@ -85,6 +86,7 @@ class CamelsTXT(Dataset):
         self.db_path = db_path
         self.scaler_dir = scaler_dir
         self.attribute_selection = attribute_selection
+        self.permutate_feature = permutate_feature
         # placeholder to store std of discharge, used for rescaling losses during training
         self.q_std = None
 
@@ -166,7 +168,13 @@ class CamelsTXT(Dataset):
         return x, y
 
     def _load_attributes(self) -> torch.Tensor:
-        df = load_attributes(self.db_path, [self.basin], drop_lat_lon=True, keep_features=self.attribute_selection)
+        df = load_attributes(
+            self.db_path,
+            [self.basin],
+            drop_lat_lon=True,
+            keep_features=self.attribute_selection,
+            permutate_feature=self.permutate_feature,
+        )
 
         # normalize data
         df = (df - self.attribute_means) / self.attribute_stds
@@ -300,7 +308,12 @@ class CamelsH5(Dataset):
         return basins
 
     def _load_attributes(self):
-        df = load_attributes(self.db_path, self.basins, drop_lat_lon=True, keep_features=self.attribute_selection)
+        df = load_attributes(
+            self.db_path,
+            self.basins,
+            drop_lat_lon=True,
+            keep_features=self.attribute_selection,
+        )
         # store means and stds
         self.attribute_means = df.mean()
         self.attribute_stds = df.std()
