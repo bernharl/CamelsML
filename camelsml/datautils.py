@@ -127,7 +127,7 @@ def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
     df.set_index("gauge_id", inplace=True)
     df.index = df.index.astype("str")
     # tmp to check
-    #df = df.dropna(axis=1)
+    # df = df.dropna(axis=1)
     # convert huc column to double digit strings
     if db_path is None:
         db_path = str(
@@ -175,7 +175,6 @@ def load_attributes(
     if permutate_feature is not None:
         df[permutate_feature] = df[permutate_feature].sample(frac=1).to_numpy()
     # return drop_basins, df
-    df = df.drop(drop_basins, axis=0)
     # drop lat/lon col
     # if drop_lat_lon:
     #    df = df.drop(["gauge_lat", "gauge_lon"], axis=1)
@@ -191,14 +190,17 @@ def load_attributes(
     for feature in keep_features:
         if feature not in df.columns:
             undefined_features.append(feature)
-            #raise ValueError(f"Feature {feature} does not exist")
+            # raise ValueError(f"Feature {feature} does not exist")
     if len(undefined_features) > 0:
-        raise ValueError(f"You have undefined features in your config. List: {undefined_features}")
+        raise ValueError(
+            f"You have undefined features in your config. List: {undefined_features}"
+        )
     length_df = len(df.columns)
     df = df.dropna(axis=1)
     length_df = length_df - len(df.columns)
-    if length_df >0:
-        print(f"{length_df} features dropped because of NaN.")
+    if length_df > 0:
+        tqdm.write(f"{length_df} features dropped because of NaN.")
+    df = df.drop(drop_basins, axis=0)
     return df
 
 
