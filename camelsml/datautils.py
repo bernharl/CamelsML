@@ -76,6 +76,8 @@ INVALID_ATTR = [
     # Discussion monday 21st
     # "gauge_latitude",
     # "gauge_longitude",
+    "gauge_lat",
+    "gauge_lon",
 ]
 
 
@@ -125,7 +127,7 @@ def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
     df.set_index("gauge_id", inplace=True)
     df.index = df.index.astype("str")
     # tmp to check
-    df = df.dropna(axis=1)
+    #df = df.dropna(axis=1)
     # convert huc column to double digit strings
     if db_path is None:
         db_path = str(
@@ -142,7 +144,6 @@ def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
 def load_attributes(
     db_path: str,
     basins: List[str],
-    drop_lat_lon: bool = True,
     keep_features: List = None,
     permutate_feature: str = None,
 ) -> pd.DataFrame:
@@ -176,8 +177,8 @@ def load_attributes(
     # return drop_basins, df
     df = df.drop(drop_basins, axis=0)
     # drop lat/lon col
-    if drop_lat_lon:
-        df = df.drop(["gauge_lat", "gauge_lon"], axis=1)
+    # if drop_lat_lon:
+    #    df = df.drop(["gauge_lat", "gauge_lon"], axis=1)
 
     # drop invalid attributes
     if keep_features is not None:
@@ -186,6 +187,18 @@ def load_attributes(
         drop_names = [c for c in df.columns if c in INVALID_ATTR]
 
     df = df.drop(drop_names, axis=1)
+    undefined_features = []
+    for feature in keep_features:
+        if feature not in df.columns:
+            undefined_features.append(feature)
+            #raise ValueError(f"Feature {feature} does not exist")
+    if len(undefined_features) > 0:
+        raise ValueError(f"You have undefined features in your config. List: {undefined_features}")
+    length_df = len(df.columns)
+    df = df.dropna(axis=1)
+    length_df = length_df - len(df.columns)
+    if length_df >0:
+        print(f"{length_df} features dropped because of NaN.")
     return df
 
 

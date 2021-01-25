@@ -171,7 +171,6 @@ class CamelsTXT(Dataset):
         df = load_attributes(
             self.db_path,
             [self.basin],
-            drop_lat_lon=True,
             keep_features=self.attribute_selection,
             permutate_feature=self.permutate_feature,
         )
@@ -311,7 +310,6 @@ class CamelsH5(Dataset):
         df = load_attributes(
             self.db_path,
             self.basins,
-            drop_lat_lon=True,
             keep_features=self.attribute_selection,
         )
         # store means and stds

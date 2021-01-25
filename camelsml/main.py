@@ -181,7 +181,9 @@ def _setup_run(cfg: Dict) -> Dict:
     return cfg
 
 
-def _prepare_data(cfg: Dict, basins: List) -> Dict:
+def _prepare_data(
+    cfg: Dict, basins: List, attribute_selection: Optional[List] = None
+) -> Dict:
     """Preprocess training data.
 
     Parameters
@@ -199,6 +201,13 @@ def _prepare_data(cfg: Dict, basins: List) -> Dict:
     # create database file containing the static basin attributes
     cfg["db_path"] = str(cfg["run_dir"] / "attributes.db")
     add_camels_attributes(cfg["camels_root"], db_path=cfg["db_path"])
+    try:
+        load_attributes(
+            db_path=cfg["db_path"], basins=basins, keep_features=attribute_selection
+        )
+    except ValueError as e:
+        print("Error detected in static feature setup!")
+        raise e
 
     # create .h5 files for train and validation data
     cfg["train_file"] = cfg["train_dir"] / "train_data.h5"
@@ -341,7 +350,7 @@ def train(cfg):
     cfg = _setup_run(cfg)
 
     # prepare data for training
-    cfg = _prepare_data(cfg=cfg, basins=basins)
+    cfg = _prepare_data(cfg=cfg, basins=basins, attribute_selection=attribute_selection)
     # prepare PyTorch DataLoader
     ds = CamelsH5(
         h5_file=cfg["train_file"],
