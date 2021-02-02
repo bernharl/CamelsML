@@ -61,6 +61,7 @@ def cross_validation_split(
     test_split: float,
     store_folder: Union[str, Path],
     seed: int,
+    dataset: List[str],
     normalize: bool = True,
 ):
     if isinstance(basin_list, str):
@@ -91,19 +92,31 @@ def cross_validation_split(
         del basins_train_list
         np.savetxt(split_folder / "basins_val.txt", basins_val, fmt="%s")
         np.savetxt(split_folder / "basins_train.txt", basins_train, fmt="%s")
-        create_normalization_file(camels_root, split_folder / "basins_train.txt")
+        create_normalization_file(
+            camels_root, split_folder / "basins_train.txt", dataset=dataset
+        )
 
 
-def create_normalization_file(camels_root: Union[str, Path], train_basin_list: Path):
+def create_normalization_file(
+    camels_root: Union[str, Path], train_basin_list: Path, dataset: List[str]
+):
     basin_list = get_basin_list(train_basin_list)
     ignore_columns = np.array(["Year", "Mnth", "Day", "Hr"])
-    mean = np.array([0, 0, 0, 0, 0, 0]).reshape(1, -1)
+    if dataset[0] == "camels_gb":
+        mean = np.array([0, 0, 0, 0, 0, 0]).reshape(1, -1)
+    elif dataset[0] == "camels_us":
+        ignore_columns = np.append(
+            ignore_columns, np.array(["swe(mm)", "dayl(s)"]).reshape(1, -1)
+        )
+        mean = np.array([0, 0, 0, 0, 0]).reshape(1, -1)
+    else:
+        raise NotImplementedError(f"Dataset {dataset[0]} not implemented.")
     mean_squared = np.zeros_like(mean)
     length = 0
     for i, basin in enumerate(tqdm(basin_list)):
-        forcing, _ = load_forcing(camels_root, basin)
+        forcing, _ = load_forcing(camels_root, basin, dataset=dataset)
         forcing = forcing.drop(ignore_columns, axis=1)
-        discharge = load_discharge(camels_root, basin, _)
+        discharge = load_discharge(camels_root, basin, _, dataset=dataset)
         if i == 0:
             mean = pd.DataFrame(mean, columns=forcing.columns)
             mean["discharge"] = np.array([0])

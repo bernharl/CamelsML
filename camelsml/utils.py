@@ -27,9 +27,9 @@ def create_h5_files(
     basins: List,
     dates: List,
     scaler_dir: Path,
+    dataset: str,
     with_basin_str: bool = True,
     seq_length: int = 270,
-    dataset: str,
 ):
     """[summary]
 

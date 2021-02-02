@@ -363,7 +363,12 @@ def load_forcing(
         df.set_index("Date", inplace=True)
         return df, 1
     elif dataset[0] == "camels_us":
-        forcing_path = camels_root / "basin_mean_forcing" / "maurer_extended"
+        forcing_path = (
+            camels_root
+            / "basin_dataset_public_v1p2"
+            / "basin_mean_forcing"
+            / "maurer_extended"
+        )
         files = list(forcing_path.glob("**/*_forcing_leap.txt"))
         file_path = [f for f in files if f.name[:8] == basin]
         if len(file_path) == 0:
@@ -416,7 +421,7 @@ def load_discharge(
 
         return df
     elif dataset[0] == "camels_us":
-        discharge_path = camels_root / "usgs_streamflow"
+        discharge_path = camels_root / "basin_dataset_public_v1p2" / "usgs_streamflow"
         files = list(discharge_path.glob("**/*_streamflow_qc.txt"))
         file_path = [f for f in files if f.name[:8] == basin]
         if len(file_path) == 0:
@@ -433,6 +438,8 @@ def load_discharge(
         df.QObs = 28316846.592 * df.QObs * 86400 / (area * 10 ** 6)
 
         return df.QObs
+    else:
+        raise NotImplementedError(f"Dataset {dataset[0]} not implemented.")
 
 
 if __name__ == "__main__":
