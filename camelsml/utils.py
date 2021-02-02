@@ -29,6 +29,7 @@ def create_h5_files(
     scaler_dir: Path,
     with_basin_str: bool = True,
     seq_length: int = 270,
+    dataset: str,
 ):
     """[summary]
 

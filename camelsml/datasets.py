@@ -8,6 +8,11 @@ submitted to Hydrol. Earth Syst. Sci. Discussions (2019)
 You should have received a copy of the Apache-2.0 license along with the code. If not,
 see <https://opensource.org/licenses/Apache-2.0>
 """
+"""
+In compliance with the Apache-2.0 license I must inform that this file has been modified
+by Bernhard Nornes Lotsberg. The original code by Kratzert et. al can be found at 
+https://github.com/kratzert/ealstm_regional_modeling
+"""
 
 from pathlib import PosixPath, Path
 from typing import List, Tuple, Dict, Optional, Union
@@ -65,6 +70,7 @@ class CamelsTXT(Dataset):
         dates: List,
         is_train: bool,
         scaler_dir: Path,
+        dataset: List[str],
         seq_length: int = 270,
         with_attributes: bool = False,
         attribute_means: pd.Series = None,
@@ -94,9 +100,13 @@ class CamelsTXT(Dataset):
         self.period_start = None
         self.period_end = None
         self.attribute_names = None
+        if len(dataset) > 1:
+            raise NotImplementedError("Support for multiple datasets not implemented.")
+        else:
+            self.dataset = dataset
         self.x, self.y = self._load_data()
         if self.with_attributes:
-            self.attributes = self._load_attributes()
+            self.attributes = self._load_attributes_gb()
 
         self.num_samples = self.x.shape[0]
 
@@ -117,8 +127,15 @@ class CamelsTXT(Dataset):
 
     def _load_data(self) -> Tuple[torch.Tensor, torch.Tensor, np.ndarray]:
         """Load input and output data from text files."""
-        df, area = load_forcing(self.camels_root, self.basin)
-        df["QObs(mm/d)"] = load_discharge(self.camels_root, self.basin, area)
+        df, area = load_forcing(
+            camels_root=self.camels_root, basin=self.basin, dataset=self.dataset
+        )
+        df["QObs(mm/d)"] = load_discharge(
+            camels_root=self.camels_root,
+            basin=self.basin,
+            area=area,
+            dataset=self.dataset,
+        )
         # we use (seq_len) time steps before start for warmup
         start_date = self.dates[0] - pd.DateOffset(days=self.seq_length - 1)
         end_date = self.dates[1]
@@ -128,17 +145,29 @@ class CamelsTXT(Dataset):
         self.period_end = df.index[-1]
         self.dates_index = df.index
         # use all meteorological variables as inputs
-        x = np.array(
-            [
-                df["precipitation"].values,
-                df["temperature"].values,
-                df["humidity"].values,
-                df["shortwave_rad"].values,
-                df["longwave_rad"].values,
-                df["windspeed"].values,
-            ]
-        ).T
-
+        if self.dataset[0] == "camels_gb":
+            x = np.array(
+                [
+                    df["precipitation"].values,
+                    df["temperature"].values,
+                    df["humidity"].values,
+                    df["shortwave_rad"].values,
+                    df["longwave_rad"].values,
+                    df["windspeed"].values,
+                ]
+            ).T
+        elif self.dataset[0] == "camels_us":
+            x = np.array(
+                [
+                    df["prcp(mm/day)"].values,
+                    df["srad(W/m2)"].values,
+                    df["tmax(C)"].values,
+                    df["tmin(C)"].values,
+                    df["vp(Pa)"].values,
+                ]
+            ).T
+        else:
+            raise NotImplementedError(f"Dataset {self.dataset[0]} not supported.")
         y = np.array([df["QObs(mm/d)"].values]).T
 
         # normalize data, reshape for LSTM training and remove invalid samples

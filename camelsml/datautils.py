@@ -81,7 +81,9 @@ INVALID_ATTR = [
 ]
 
 
-def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
+def add_camels_attributes(
+    camels_root: PosixPath, dataset: List[str], db_path: str = None
+):
     """Load catchment characteristics from txt files and store them in a sqlite3 table
 
     Parameters
@@ -97,9 +99,16 @@ def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
     RuntimeError
         If CAMELS attributes folder could not be found.
     """
-    attributes_path = (
-        Path(camels_root) / "8344e4f3-d2ea-44f5-8afa-86d2987543a9" / "data"
-    )
+    if dataset[0] == "camels_gb":
+        filename = "CAMELS_GB_*.csv"
+        attributes_path = (
+            Path(camels_root) / "8344e4f3-d2ea-44f5-8afa-86d2987543a9" / "data"
+        )
+    elif dataset[0] == "camels_us":
+        filename = "camels_*.txt"
+        attributes_path = Path(camels_root) / "camels_attributes_v2.0"
+    else:
+        raise NotImplementedError(f"Dataset {dataset[0]} not supported")
 
     if not attributes_path.exists():
         raise RuntimeError(f"Attribute folder not found at {attributes_path}")
@@ -114,28 +123,20 @@ def add_camels_attributes(camels_root: PosixPath, db_path: str = None):
             df = df_temp.copy()
         else:
             df = pd.concat([df, df_temp], axis=1)
-        # df_temp = pd.read_csv(f, sep=";", header=0, dtype={"gauge_id": str})
-        # df_temp = df_temp.set_index("gauge_id")
-
-        # if df is None:
-        #    df = df_temp.copy()
-        # else:
-        #    df = pd.concat([df, df_temp], axis=1)
+    if dataset[0] == "camels_us":
+        df["huc"] = df["huc_02"].apply(lambda x: str(x).zfill(2))
+        df = df.drop("huc_02", axis=1)
     df = df.loc[:, ~df.columns.duplicated()]
     df = df.select_dtypes(exclude=["object"])
-    # np.savetxt("data/basin_list.txt", df["gauge_id"].values, fmt="%s")
     df.set_index("gauge_id", inplace=True)
     df.index = df.index.astype("str")
-    # tmp to check
-    # df = df.dropna(axis=1)
-    # convert huc column to double digit strings
     if db_path is None:
         db_path = str(
             Path(__file__).absolute().parent.parent / "data" / "attributes.db"
         )
 
     with sqlite3.connect(db_path) as conn:
-        # insert into databse
+        # insert into database
         df.to_sql("basin_attributes", conn)
 
     print(f"Sucessfully stored basin attributes in {db_path}.")
@@ -310,7 +311,10 @@ def reshape_data(
 
 
 def load_forcing(
-    camels_root: Path, basin: str, remove_nan: bool = True
+    camels_root: Path,
+    basin: str,
+    dataset: List[str],
+    remove_nan: bool = True,
 ) -> Tuple[pd.DataFrame, int]:
     """Load the meteorological forcing data of a specific basin.
 
@@ -323,43 +327,67 @@ def load_forcing(
         camels_root = Path(camels_root)
     elif not isinstance(camels_root, Path):
         raise ValueError(f"camels_root must be Path or str, not {type(camels_root)}")
-    path = (
-        camels_root
-        / "8344e4f3-d2ea-44f5-8afa-86d2987543a9"
-        / "data"
-        / "timeseries"
-        / f"CAMELS_GB_hydromet_timeseries_{basin}_19701001-20150930.csv"
-    )
-    exclude = ["pet", "discharge_vol", "discharge_spec", "peti"]
-    df = pd.read_csv(path)
-    # print(df[df.isna().any(axis=1)])
-    # tqdm.write(f"Basin {basin} before dropna: {len(df)}")
-    if remove_nan:
-        df = df.dropna()
-    # tqdm.write(f"Basin {basin} after dropna: {len(df)}")
-    columns = df.columns.values
-    df = df.drop(exclude, axis=1)
-    dates = pd.to_datetime(df["date"])
-    year = []
-    day = []
-    month = []
-    hour = np.ones(len(dates)) * 12
-    for date in df["date"]:
-        date_split = date.split("-")
-        year.append(int(date_split[0]))
-        month.append(int(date_split[1]))
-        day.append(int(date_split[2]))
-    df["Year"] = np.array(year)
-    df["Mnth"] = np.array(month)
-    df["Day"] = np.array(day)
-    df["Hr"] = hour
-    df["Date"] = dates
-    df.drop("date", axis=1, inplace=True)
-    df.set_index("Date", inplace=True)
-    return df, 1
+    if dataset[0] == "camels_gb":
+        path = (
+            camels_root
+            / "8344e4f3-d2ea-44f5-8afa-86d2987543a9"
+            / "data"
+            / "timeseries"
+            / f"CAMELS_GB_hydromet_timeseries_{basin}_19701001-20150930.csv"
+        )
+        exclude = ["pet", "discharge_vol", "discharge_spec", "peti"]
+        df = pd.read_csv(path)
+        # print(df[df.isna().any(axis=1)])
+        # tqdm.write(f"Basin {basin} before dropna: {len(df)}")
+        if remove_nan:
+            df = df.dropna()
+        # tqdm.write(f"Basin {basin} after dropna: {len(df)}")
+        columns = df.columns.values
+        df = df.drop(exclude, axis=1)
+        dates = pd.to_datetime(df["date"])
+        year = []
+        day = []
+        month = []
+        hour = np.ones(len(dates)) * 12
+        for date in df["date"]:
+            date_split = date.split("-")
+            year.append(int(date_split[0]))
+            month.append(int(date_split[1]))
+            day.append(int(date_split[2]))
+        df["Year"] = np.array(year)
+        df["Mnth"] = np.array(month)
+        df["Day"] = np.array(day)
+        df["Hr"] = hour
+        df["Date"] = dates
+        df.drop("date", axis=1, inplace=True)
+        df.set_index("Date", inplace=True)
+        return df, 1
+    elif dataset[0] == "camels_us":
+        forcing_path = camels_root / "basin_mean_forcing" / "maurer_extended"
+        files = list(forcing_path.glob("**/*_forcing_leap.txt"))
+        file_path = [f for f in files if f.name[:8] == basin]
+        if len(file_path) == 0:
+            raise RuntimeError(f"No file for Basin {basin} at {file_path}")
+        else:
+            file_path = file_path[0]
+
+        df = pd.read_csv(file_path, sep="\s+", header=3)
+        dates = df.Year.map(str) + "/" + df.Mnth.map(str) + "/" + df.Day.map(str)
+        df.index = pd.to_datetime(dates, format="%Y/%m/%d")
+
+        # load area from header
+        with open(file_path, "r") as fp:
+            content = fp.readlines()
+            area = int(content[2])
+
+        return df, area
+    else:
+        raise NotImplementedError(f"Dataset {dataset[0]} not implemented.")
 
 
-def load_discharge(camels_root: Path, basin: str, area: int) -> pd.Series:
+def load_discharge(
+    camels_root: Path, basin: str, area: int, dataset: List[str]
+) -> pd.Series:
     """Load the discharge time series for a specific basin.
 
     :param basin: 8-digit code of basin as string.
@@ -371,21 +399,40 @@ def load_discharge(camels_root: Path, basin: str, area: int) -> pd.Series:
         camels_root = Path(camels_root)
     elif not isinstance(camels_root, Path):
         raise ValueError(f"camels_root must be Path or str, not {type(camels_root)}")
-    discharge_path = (
-        camels_root
-        / "8344e4f3-d2ea-44f5-8afa-86d2987543a9"
-        / "data"
-        / "timeseries"
-        / f"CAMELS_GB_hydromet_timeseries_{basin}_19701001-20150930.csv"
-    )
-    df = pd.read_csv(discharge_path)
-    df["date"] = pd.to_datetime(df["date"])
-    df.set_index("date", inplace=True)
-    df = df["discharge_spec"]
-    df.fillna(0, inplace=True)
-    df = pd.to_numeric(df)
+    if dataset[0] == "camels_gb":
+        discharge_path = (
+            camels_root
+            / "8344e4f3-d2ea-44f5-8afa-86d2987543a9"
+            / "data"
+            / "timeseries"
+            / f"CAMELS_GB_hydromet_timeseries_{basin}_19701001-20150930.csv"
+        )
+        df = pd.read_csv(discharge_path)
+        df["date"] = pd.to_datetime(df["date"])
+        df.set_index("date", inplace=True)
+        df = df["discharge_spec"]
+        df.fillna(0, inplace=True)
+        df = pd.to_numeric(df)
 
-    return df
+        return df
+    elif dataset[0] == "camels_us":
+        discharge_path = camels_root / "usgs_streamflow"
+        files = list(discharge_path.glob("**/*_streamflow_qc.txt"))
+        file_path = [f for f in files if f.name[:8] == basin]
+        if len(file_path) == 0:
+            raise RuntimeError(f"No file for Basin {basin} at {file_path}")
+        else:
+            file_path = file_path[0]
+
+        col_names = ["basin", "Year", "Mnth", "Day", "QObs", "flag"]
+        df = pd.read_csv(file_path, sep="\s+", header=None, names=col_names)
+        dates = df.Year.map(str) + "/" + df.Mnth.map(str) + "/" + df.Day.map(str)
+        df.index = pd.to_datetime(dates, format="%Y/%m/%d")
+
+        # normalize discharge from cubic feed per second to mm per day
+        df.QObs = 28316846.592 * df.QObs * 86400 / (area * 10 ** 6)
+
+        return df.QObs
 
 
 if __name__ == "__main__":

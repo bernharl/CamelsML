@@ -208,10 +208,14 @@ def _prepare_data(
     """
     # create database file containing the static basin attributes
     cfg["db_path"] = str(cfg["run_dir"] / "attributes.db")
-    add_camels_attributes(cfg["camels_root"], db_path=cfg["db_path"])
+    add_camels_attributes(
+        cfg["camels_root"], db_path=cfg["db_path"], dataset=cfg["dataset"]
+    )
     try:
         load_attributes(
-            db_path=cfg["db_path"], basins=basins, keep_features=attribute_selection
+            db_path=cfg["db_path"],
+            basins=basins,
+            keep_features=attribute_selection,
         )
     except ValueError as e:
         print("Error detected in static feature setup!")
@@ -227,6 +231,7 @@ def _prepare_data(
         with_basin_str=True,
         seq_length=cfg["seq_length"],
         scaler_dir=cfg["train_basin_file"].parent,
+        dataset=cfg["dataset"],
     )
 
     return cfg
@@ -565,7 +570,9 @@ def evaluate(
     # get attribute means/stds
     db_path = str(user_cfg["run_dir"] / "attributes.db")
     attributes = load_attributes(
-        db_path=db_path, basins=basins, keep_features=attribute_selection
+        db_path=db_path,
+        basins=basins,
+        keep_features=attribute_selection,
     )
     if split == "train":
         means = attributes.mean()
@@ -622,6 +629,7 @@ def evaluate(
                 scaler_dir=user_cfg["train_basin_file"].parent,
                 attribute_selection=attribute_selection,
                 permutate_feature=permutate_feature,
+                dataset=user_cfg["dataset"],
             )
         except ValueError as e:
             # raise e
