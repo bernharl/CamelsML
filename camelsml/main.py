@@ -65,6 +65,11 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
         else:
             raise TypeError("A variable could not be converted to bool, check config")
 
+    def split_list(var):
+        var = var.split(",")
+        var = [x.strip(" ") for x in var]
+        return var
+
     types = {
         "epochs": int,
         "camels_root": Path,
@@ -99,6 +104,7 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
         "attribute_selection_file": Path,
         "early_stopping": bool_type,
         "early_stopping_steps": int,
+        "dataset": split_list,
     }
     cfg["num_workers"] = num_workers
     cfg["device"] = device
@@ -134,6 +140,8 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
             + "setting evaluate_on_epoch to True"
         )
         cfg["evaluate_on_epoch"] = True
+    if "dataset" not in cfg.keys():
+        cfg["dataset"] = ["camels_gb"]
     return cfg
 
 
