@@ -106,7 +106,7 @@ class CamelsTXT(Dataset):
             self.dataset = dataset
         self.x, self.y = self._load_data()
         if self.with_attributes:
-            self.attributes = self._load_attributes_gb()
+            self.attributes = self._load_attributes()
 
         self.num_samples = self.x.shape[0]
 

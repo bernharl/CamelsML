@@ -231,7 +231,7 @@ def _prepare_data(
         with_basin_str=True,
         seq_length=cfg["seq_length"],
         scaler_dir=cfg["train_basin_file"].parent,
-        dataset=cfg["dataset"],
+        dataset_name=cfg["dataset"],
     )
 
     return cfg
@@ -586,7 +586,26 @@ def evaluate(
         means = attributes_train.mean()
         stds = attributes_train.std()
     attrs_count = len(attributes.columns)
-    timeseries_count = 6
+    # Creating tmp dataset for getting amount of time series.
+    ds_tmp = CamelsTXT(
+        camels_root=user_cfg["camels_root"],
+        basin=basins[0],
+        dates=[user_cfg[f"{split}_start"], user_cfg[f"{split}_end"]],
+        is_train=False,
+        seq_length=run_cfg["seq_length"],
+        # This SHOULD be more correct
+        with_attributes=not run_cfg["no_static"],
+        attribute_means=means,
+        attribute_stds=stds,
+        concat_static=run_cfg["concat_static"],
+        db_path=db_path,
+        scaler_dir=user_cfg["train_basin_file"].parent,
+        attribute_selection=attribute_selection,
+        permutate_feature=permutate_feature,
+        dataset=user_cfg["dataset"],
+    )
+    timeseries_count = ds_tmp.x.shape[-1]
+    del ds_tmp
     # create model
     # NOTE: Check this more thoroughly later, could be a bug with concat_static=True
     input_size_stat = timeseries_count if run_cfg["no_static"] else attrs_count

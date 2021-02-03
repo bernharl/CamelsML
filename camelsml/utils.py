@@ -27,7 +27,7 @@ def create_h5_files(
     basins: List,
     dates: List,
     scaler_dir: Path,
-    dataset: str,
+    dataset_name: str,
     with_basin_str: bool = True,
     seq_length: int = 270,
 ):
@@ -55,11 +55,21 @@ def create_h5_files(
     """
     if out_file.is_file():
         raise FileExistsError(f"File already exists at {out_file}")
+    dataset = CamelsTXT(
+        camels_root=camels_root,
+        basin=basins[0],
+        is_train=True,
+        seq_length=seq_length,
+        dates=dates,
+        scaler_dir=scaler_dir,
+        dataset=dataset_name,
+    )
+    num_timeseries = dataset.x.shape[-1]
     with h5py.File(out_file, "w") as out_f:
         input_data = out_f.create_dataset(
             "input_data",
-            shape=(0, seq_length, 6),
-            maxshape=(None, seq_length, 6),
+            shape=(0, seq_length, num_timeseries),
+            maxshape=(None, seq_length, num_timeseries),
             chunks=True,
             dtype=np.float32,
             compression="gzip",
@@ -100,13 +110,13 @@ def create_h5_files(
                 seq_length=seq_length,
                 dates=dates,
                 scaler_dir=scaler_dir,
+                dataset=dataset_name,
             )
 
             num_samples = len(dataset)
             total_samples = input_data.shape[0] + num_samples
-
             # store input and output samples
-            input_data.resize((total_samples, seq_length, 6))
+            input_data.resize((total_samples, seq_length, num_timeseries))
             target_data.resize((total_samples, 1))
             input_data[-num_samples:, :, :] = dataset.x
             target_data[-num_samples:, :] = dataset.y

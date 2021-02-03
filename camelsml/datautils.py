@@ -106,19 +106,25 @@ def add_camels_attributes(
         )
     elif dataset[0] == "camels_us":
         filename = "camels_*.txt"
-        attributes_path = Path(camels_root) / "camels_attributes_v2.0"
+        attributes_path = (
+            Path(camels_root) / "basin_dataset_public_v1p2" / "camels_attributes_v2.0"
+        )
     else:
         raise NotImplementedError(f"Dataset {dataset[0]} not supported")
 
     if not attributes_path.exists():
         raise RuntimeError(f"Attribute folder not found at {attributes_path}")
 
-    txt_files = attributes_path.glob("CAMELS_GB_*.csv")
+    txt_files = attributes_path.glob(filename)
 
     # Read-in attributes into one big dataframe
     df = None
     for f in txt_files:
-        df_temp = pd.read_csv(f)
+        if dataset[0] == "camels_gb":
+            df_temp = pd.read_csv(f)
+        elif dataset[0] == "camels_us":
+            df_temp = pd.read_csv(f, sep=";", header=0, dtype={"gauge_id": str})
+            df_temp = df_temp.set_index("gauge_id")
         if df is None:
             df = df_temp.copy()
         else:
@@ -128,8 +134,9 @@ def add_camels_attributes(
         df = df.drop("huc_02", axis=1)
     df = df.loc[:, ~df.columns.duplicated()]
     df = df.select_dtypes(exclude=["object"])
-    df.set_index("gauge_id", inplace=True)
-    df.index = df.index.astype("str")
+    if dataset[0] == "camels_gb":
+        df.set_index("gauge_id", inplace=True)
+        df.index = df.index.astype("str")
     if db_path is None:
         db_path = str(
             Path(__file__).absolute().parent.parent / "data" / "attributes.db"
