@@ -658,6 +658,19 @@ def evaluate(
             # raise e
             tqdm.write(f"Skipped {basin} because 0 length")
             continue
+
+        # Remove nan and negative values. Mostly due to missing
+        # data in the beginning of the time series'
+        # This is not applied in CamelsTXT when is_train=False as we may
+        # sometimes be interested in looking at the missing values.
+        bad_values = np.argwhere(
+            np.logical_or(ds_test.y < 0, np.isnan(ds_test.y))
+        )  # [:, 0]
+        ds_test.x = np.delete(ds_test.x, bad_values, axis=0)
+        ds_test.y = np.delete(ds_test.y, bad_values, axis=0)
+        ds_test.num_samples = ds_test.x.shape[0]
+        if len(ds_test.y) == 0:
+            tqdm.write(f"Skipping basin {basin} because of no data.")
         loader = DataLoader(
             ds_test,
             batch_size=user_cfg["batch_size"],
