@@ -18,6 +18,7 @@ https://github.com/kratzert/ealstm_regional_modeling
 import sqlite3
 from pathlib import Path, PosixPath
 from typing import List, Tuple, Dict
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -203,11 +204,12 @@ def load_attributes(
         raise ValueError(
             f"You have undefined features in your config. List: {undefined_features}"
         )
-    length_df = len(df.columns)
+    columns = df.columns
     df = df.dropna(axis=1)
-    length_df = length_df - len(df.columns)
-    # if length_df > 0:
-    #     tqdm.write(f"{length_df} features dropped because of NaN.")
+    columns_after = df.columns
+    for feature in columns:
+        if feature not in columns_after:
+            warnings.warn(f"Dropped {feature} because of NaN!")
     df = df.drop(drop_basins, axis=0)
     return df
 
