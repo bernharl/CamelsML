@@ -182,7 +182,9 @@ class CamelsTXT(Dataset):
 
             # Delete all samples, where discharge is NaN
             if np.sum(np.isnan(y)) > 0:
-                print(f"Deleted some records because of NaNs in basin {self.basin}")
+                tqdm.write(
+                    f"Deleted some records because of NaNs in basin {self.basin}"
+                )
                 x = np.delete(x, np.argwhere(np.isnan(y)), axis=0)
                 y = np.delete(y, np.argwhere(np.isnan(y)), axis=0)
 
