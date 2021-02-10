@@ -195,15 +195,16 @@ def load_attributes(
         drop_names = [c for c in df.columns if c in INVALID_ATTR]
 
     df = df.drop(drop_names, axis=1)
-    undefined_features = []
-    for feature in keep_features:
-        if feature not in df.columns:
-            undefined_features.append(feature)
-            # raise ValueError(f"Feature {feature} does not exist")
-    if len(undefined_features) > 0:
-        raise ValueError(
-            f"You have undefined features in your config. List: {undefined_features}"
-        )
+    if keep_features is not None:
+        undefined_features = []
+        for feature in keep_features:
+            if feature not in df.columns:
+                undefined_features.append(feature)
+                # raise ValueError(f"Feature {feature} does not exist")
+        if len(undefined_features) > 0:
+            raise ValueError(
+                f"You have undefined features in your config. List: {undefined_features}"
+            )
     columns = df.columns
     df = df.dropna(axis=1)
     columns_after = df.columns
