@@ -145,6 +145,14 @@ class CamelsTXT(Dataset):
         self.period_end = df.index[-1]
         self.dates_index = df.index
         # use all meteorological variables as inputs
+        if "camels_gb" in self.dataset and "camels_us" in self.dataset:
+            x = np.array(
+                [
+                    df["precipitation"].values,
+                    df["temperature"].values,
+                    df["shortwave_rad"].values
+                ]
+            )
         if self.dataset[0] == "camels_gb":
             x = np.array(
                 [
