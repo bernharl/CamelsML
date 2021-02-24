@@ -8,6 +8,11 @@ submitted to Hydrol. Earth Syst. Sci. Discussions (2019)
 You should have received a copy of the Apache-2.0 license along with the code. If not,
 see <https://opensource.org/licenses/Apache-2.0>
 """
+"""
+In compliance with the Apache-2.0 license I must inform that this file has been modified
+by Bernhard Nornes Lotsberg. The original code by Kratzert et. al can be found at 
+https://github.com/kratzert/ealstm_regional_modeling
+"""
 
 import sys
 from pathlib import Path, PosixPath
@@ -27,6 +32,7 @@ def create_h5_files(
     basins: List,
     dates: List,
     scaler_dir: Path,
+    timeseries: List[str],
     dataset_name: str,
     with_basin_str: bool = True,
     seq_length: int = 270,
@@ -63,6 +69,7 @@ def create_h5_files(
         dates=dates,
         scaler_dir=scaler_dir,
         dataset=dataset_name,
+        timeseries=timeseries,
     )
     num_timeseries = dataset.x.shape[-1]
     with h5py.File(out_file, "w") as out_f:
@@ -111,6 +118,7 @@ def create_h5_files(
                 dates=dates,
                 scaler_dir=scaler_dir,
                 dataset=dataset_name,
+                timeseries=timeseries,
             )
 
             num_samples = len(dataset)

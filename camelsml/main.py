@@ -8,6 +8,11 @@ submitted to Hydrol. Earth Syst. Sci. Discussions (2019)
 You should have received a copy of the Apache-2.0 license along with the code. If not,
 see <https://opensource.org/licenses/Apache-2.0>
 """
+"""
+In compliance with the Apache-2.0 license I must inform that this file has been modified
+by Bernhard Nornes Lotsberg. The original code by Kratzert et. al can be found at 
+https://github.com/kratzert/ealstm_regional_modeling
+"""
 
 import argparse
 import json
@@ -105,6 +110,7 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
         "early_stopping": bool_type,
         "early_stopping_steps": int,
         "dataset": split_list,
+        "timeseries": split_list,
     }
     cfg["num_workers"] = num_workers
     cfg["device"] = device
@@ -142,6 +148,25 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
         cfg["evaluate_on_epoch"] = True
     if "dataset" not in cfg.keys():
         cfg["dataset"] = ["camels_gb"]
+
+    if "timeseries" not in cfg.keys():
+        if cfg["dataset"] == "camels_gb":
+            cfg["timeseries"] = [
+                "precipitation",
+                "temperature",
+                "humidity",
+                "shortwave_rad",
+                "longwave_rad",
+                "windspeed",
+            ]
+        elif cfg["dataset"] == "camels_us":
+            cfg["timeseries"] = [
+                "prcp(mm/day)",
+                "srad(W/m2)",
+                "tmax(C)",
+                "tmin(C)",
+                "vp(Pa)",
+            ]
     return cfg
 
 
@@ -232,6 +257,7 @@ def _prepare_data(
         seq_length=cfg["seq_length"],
         scaler_dir=cfg["train_basin_file"].parent,
         dataset_name=cfg["dataset"],
+        timeseries=cfg["timeseries"],
     )
 
     return cfg
@@ -603,6 +629,7 @@ def evaluate(
         attribute_selection=attribute_selection,
         permutate_feature=permutate_feature,
         dataset=user_cfg["dataset"],
+        timeseries=user_cfg["timeseries"],
     )
     timeseries_count = ds_tmp.x.shape[-1]
     del ds_tmp
@@ -649,6 +676,7 @@ def evaluate(
                 attribute_selection=attribute_selection,
                 permutate_feature=permutate_feature,
                 dataset=user_cfg["dataset"],
+                timeseries=user_cfg["timeseries"],
             )
         except ValueError as e:
             # raise e

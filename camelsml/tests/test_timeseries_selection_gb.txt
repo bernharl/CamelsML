@@ -1,0 +1,1 @@
+timeseries: precipitation, temperature, humidity, shortwave_rad, longwave_rad, windspeed

@@ -71,6 +71,7 @@ class CamelsTXT(Dataset):
         is_train: bool,
         scaler_dir: Path,
         dataset: List[str],
+        timeseries: List[str]
         seq_length: int = 270,
         with_attributes: bool = False,
         attribute_means: pd.Series = None,
@@ -93,6 +94,7 @@ class CamelsTXT(Dataset):
         self.scaler_dir = scaler_dir
         self.attribute_selection = attribute_selection
         self.permutate_feature = permutate_feature
+        self.timeseries = timeseries
         # placeholder to store std of discharge, used for rescaling losses during training
         self.q_std = None
 
@@ -145,35 +147,11 @@ class CamelsTXT(Dataset):
         self.period_end = df.index[-1]
         self.dates_index = df.index
         # use all meteorological variables as inputs
-        if "camels_gb" in self.dataset and "camels_us" in self.dataset:
-            x = np.array(
-                [
-                    df["precipitation"].values,
-                    df["temperature"].values,
-                    df["shortwave_rad"].values
-                ]
-            )
-        if self.dataset[0] == "camels_gb":
-            x = np.array(
-                [
-                    df["precipitation"].values,
-                    df["temperature"].values,
-                    df["humidity"].values,
-                    df["shortwave_rad"].values,
-                    df["longwave_rad"].values,
-                    df["windspeed"].values,
-                ]
-            ).T
-        elif self.dataset[0] == "camels_us":
-            x = np.array(
-                [
-                    df["prcp(mm/day)"].values,
-                    df["srad(W/m2)"].values,
-                    df["tmax(C)"].values,
-                    df["tmin(C)"].values,
-                    df["vp(Pa)"].values,
-                ]
-            ).T
+        x = np.array(
+            [
+                x_ for x_ in self.timeseries
+            ]
+        )
         else:
             raise NotImplementedError(f"Dataset {self.dataset[0]} not supported.")
         y = np.array([df["QObs(mm/d)"].values]).T

@@ -15,6 +15,8 @@ def split_basins(
     basin_list: Union[str, Path],
     split: List[float],
     store_folder: Union[str, Path],
+    timeseries: List[str],
+    dataset: List[str],
     seed: int,
     normalize: bool = True,
 ):
@@ -51,7 +53,12 @@ def split_basins(
     if len(split) == 3:
         np.savetxt(store_folder / "basins_validation.txt", basins_validation, fmt="%s")
     if normalize:
-        create_normalization_file(camels_root, store_folder / "basins_train.txt")
+        create_normalization_file(
+            camels_root,
+            store_folder / "basins_train.txt",
+            dataset=dataset,
+            timeseries=timeseries,
+        )
 
 
 def cross_validation_split(
@@ -62,6 +69,7 @@ def cross_validation_split(
     store_folder: Union[str, Path],
     seed: int,
     dataset: List[str],
+    timeseries: List[str],
     normalize: bool = True,
 ):
     if isinstance(basin_list, str):
@@ -93,29 +101,26 @@ def cross_validation_split(
         np.savetxt(split_folder / "basins_val.txt", basins_val, fmt="%s")
         np.savetxt(split_folder / "basins_train.txt", basins_train, fmt="%s")
         create_normalization_file(
-            camels_root, split_folder / "basins_train.txt", dataset=dataset
+            camels_root,
+            split_folder / "basins_train.txt",
+            dataset=dataset,
+            timeseries=timeseries,
         )
 
 
 def create_normalization_file(
-    camels_root: Union[str, Path], train_basin_list: Path, dataset: List[str]
+    camels_root: Union[str, Path],
+    train_basin_list: Path,
+    dataset: List[str],
+    timeseries: List[str],
 ):
     basin_list = get_basin_list(train_basin_list)
-    ignore_columns = np.array(["Year", "Mnth", "Day", "Hr"])
-    if dataset[0] == "camels_gb":
-        mean = np.array([0, 0, 0, 0, 0, 0]).reshape(1, -1)
-    elif dataset[0] == "camels_us":
-        ignore_columns = np.append(
-            ignore_columns, np.array(["swe(mm)", "dayl(s)"]).reshape(1, -1)
-        )
-        mean = np.array([0, 0, 0, 0, 0]).reshape(1, -1)
-    else:
-        raise NotImplementedError(f"Dataset {dataset[0]} not implemented.")
+    mean = np.zeros(len(timeseries)).reshape(1, -1)
     mean_squared = np.zeros_like(mean)
     length = 0
     for i, basin in enumerate(tqdm(basin_list)):
         forcing, _ = load_forcing(camels_root, basin, dataset=dataset)
-        forcing = forcing.drop(ignore_columns, axis=1)
+        forcing = forcing[columns]
         discharge = load_discharge(camels_root, basin, _, dataset=dataset)
         if i == 0:
             mean = pd.DataFrame(mean, columns=forcing.columns)
