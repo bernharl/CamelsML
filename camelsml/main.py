@@ -111,6 +111,8 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
         "early_stopping_steps": int,
         "dataset": split_list,
         "timeseries": split_list,
+        "camels_gb_root": Path,
+        "camels_us_root": Path,
     }
     cfg["num_workers"] = num_workers
     cfg["device"] = device
@@ -150,7 +152,7 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
         cfg["dataset"] = ["camels_gb"]
 
     if "timeseries" not in cfg.keys():
-        if cfg["dataset"] == "camels_gb":
+        if cfg["dataset"] == ["camels_gb"]:
             cfg["timeseries"] = [
                 "precipitation",
                 "temperature",
@@ -159,7 +161,7 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
                 "longwave_rad",
                 "windspeed",
             ]
-        elif cfg["dataset"] == "camels_us":
+        elif cfg["dataset"] == ["camels_us"]:
             cfg["timeseries"] = [
                 "prcp(mm/day)",
                 "srad(W/m2)",
@@ -167,6 +169,16 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
                 "tmin(C)",
                 "vp(Pa)",
             ]
+        elif "camels_gb" in cfg["dataset"] and "camels_us" in cfg["dataset"]:
+            cfg["timeseries"] = ["precipitation", "temperature", "shortwave_rad"]
+
+    if "camels_root" in cfg and ("camels_gb_root" in cfg or "camels_us_root" in cfg):
+        warnings.warn(
+            f"Variable camels_root={cfg['camels_root']} ignored"
+            + f"because camels_us_root or camels_gb_root set."
+        )
+    if "camels_us_root" in cfg and "camels_gb_root" in cfg:
+        cfg["camels_root"] = {"us": cfg["camels_us_root"], "gb": cfg["camels_gb_root"]}
     return cfg
 
 

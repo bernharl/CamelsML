@@ -71,7 +71,7 @@ class CamelsTXT(Dataset):
         is_train: bool,
         scaler_dir: Path,
         dataset: List[str],
-        timeseries: List[str]
+        timeseries: List[str],
         seq_length: int = 270,
         with_attributes: bool = False,
         attribute_means: pd.Series = None,
@@ -147,13 +147,7 @@ class CamelsTXT(Dataset):
         self.period_end = df.index[-1]
         self.dates_index = df.index
         # use all meteorological variables as inputs
-        x = np.array(
-            [
-                x_ for x_ in self.timeseries
-            ]
-        )
-        else:
-            raise NotImplementedError(f"Dataset {self.dataset[0]} not supported.")
+        x = np.array([x_ for x_ in self.timeseries])
         y = np.array([df["QObs(mm/d)"].values]).T
 
         # normalize data, reshape for LSTM training and remove invalid samples

@@ -1,4 +1,4 @@
-from typing import Union, Dict, List
+from typing import Union, Dict, List, Optional
 from pathlib import Path
 from datetime import date
 
@@ -108,6 +108,51 @@ def cross_validation_split(
         )
 
 
+def combine_cv_datasets(
+    cv_folder_1: Path,
+    cv_folder_2: Path,
+    store_folder: Path,
+    seed: int,
+    k: int = 5,
+    normalize: bool = True,
+    timeseries: Optional[List[str]] = None,
+    dataset: Optional[List[str]] = None,
+    camels_root: Optional[Union[Path, str, List[Union[Path, str]]]] = None,
+):
+    store_folder = store_folder / f"cross_validation_seed_{seed}"
+    store_folder.mkdir(exist_ok=True, parents=True)
+    cv1 = cv_folder_1 / f"cross_validation_seed_{seed}"
+    cv2 = cv_folder_2 / f"cross_validation_seed_{seed}"
+
+    test1 = np.loadtxt(cv1 / "basins_test.txt", dtype="str")
+    test2 = np.loadtxt(cv2 / "basins_test.txt", dtype="str")
+    test = np.append(test1, test2)
+    np.savetxt(store_folder / "basins_test.txt", test, fmt="%s")
+
+    for i in range(k):
+        train1, train2 = (
+            np.loadtxt(cv1 / f"{i}" / "basins_train.txt", dtype="str"),
+            np.loadtxt(cv2 / f"{i}" / "basins_train.txt", dtype="str"),
+        )
+        train = np.append(train1, train2)
+        cv_folder = store_folder / f"{i}"
+        cv_folder.mkdir(exist_ok=True)
+        np.savetxt(cv_folder / "basins_train.txt", train, fmt="%s")
+        if normalize:
+            create_normalization_file(
+                camels_root=camels_root,
+                dataset=dataset,
+                train_basin_list=cv_folder / "basins_train.txt",
+                timeseries=timeseries,
+            )
+        val1, val2 = (
+            np.loadtxt(cv1 / f"{i}" / "basins_val.txt", dtype="str"),
+            np.loadtxt(cv2 / f"{i}" / "basins_val.txt", dtype="str"),
+        )
+        val = np.append(val1, val2)
+        np.savetxt(cv_folder / "basins_val.txt", val, fmt="%s")
+
+
 def create_normalization_file(
     camels_root: Union[str, Path],
     train_basin_list: Path,
@@ -120,7 +165,7 @@ def create_normalization_file(
     length = 0
     for i, basin in enumerate(tqdm(basin_list)):
         forcing, _ = load_forcing(camels_root, basin, dataset=dataset)
-        forcing = forcing[columns]
+        forcing = forcing[timeseries]
         discharge = load_discharge(camels_root, basin, _, dataset=dataset)
         if i == 0:
             mean = pd.DataFrame(mean, columns=forcing.columns)

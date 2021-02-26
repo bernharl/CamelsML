@@ -17,7 +17,7 @@ https://github.com/kratzert/ealstm_regional_modeling
 
 import sqlite3
 from pathlib import Path, PosixPath
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 import warnings
 
 import numpy as np
@@ -147,7 +147,8 @@ def add_camels_attributes(
         # insert into database
         df.to_sql("basin_attributes", conn)
 
-    print(f"Sucessfully stored basin attributes in {db_path}.")
+    print(f"Successfully stored basin attributes in {db_path}.")
+    raise JeffError
 
 
 def load_attributes(
@@ -321,7 +322,7 @@ def reshape_data(
 
 
 def load_forcing(
-    camels_root: Path,
+    camels_root: Union[Path, str, Dict[str, Union[Path, str]]],
     basin: str,
     dataset: List[str],
     remove_nan: bool = True,
@@ -335,9 +336,39 @@ def load_forcing(
     """
     if isinstance(camels_root, str):
         camels_root = Path(camels_root)
+    elif isinstance(camels_root, Dict):
+        for i, key in enumerate(camels_root.keys()):
+            if key not in ("us", "gb"):
+                raise ValueError(f"Key {key} not recognized!")
+            if not isinstance(camels_root[key], Path):
+                camels_root[key] = Path(camels_root[key])
     elif not isinstance(camels_root, Path):
-        raise ValueError(f"camels_root must be Path or str, not {type(camels_root)}")
-    if dataset[0] == "camels_gb":
+        raise ValueError(
+            f"camels_root must be Path or str or list thereof, not {type(camels_root)}"
+        )
+    if "camels_us" in dataset and "camels_gb" in dataset:
+        basin = basin.split("_")
+        if basin[0] == "us":
+            camels_root = camels_root["us"]
+            df, area = load_forcing(
+                camels_root,
+                basin[1],
+                ["camels_us"],
+            )
+            df["temperature"] = (df["tmin(C)"] + df["tmax(C)"]) / 2
+            df = df.rename(
+                columns={
+                    "srad(W/m2)": "shortwave_rad",
+                    "prcp(mm/day)": "precipitation",
+                },
+                errors="raise",
+            )
+            return df, area
+        elif basin[0] == "gb":
+            camels_root = camels_root["gb"]
+            df, _ = load_forcing(camels_root, basin[1], ["camels_gb"])
+            return df, _
+    elif dataset[0] == "camels_gb":
         path = (
             camels_root
             / "8344e4f3-d2ea-44f5-8afa-86d2987543a9"
@@ -397,7 +428,7 @@ def load_forcing(
 
         return df, area
     else:
-        raise NotImplementedError(f"Dataset {dataset[0]} not implemented.")
+        raise NotImplementedError(f"Dataset {dataset} not implemented.")
 
 
 def load_discharge(
@@ -412,9 +443,21 @@ def load_discharge(
     """
     if isinstance(camels_root, str):
         camels_root = Path(camels_root)
+    elif isinstance(camels_root, Dict):
+        for i, key in enumerate(camels_root.keys()):
+            if not isinstance(camels_root[key], Path):
+                camels_root[key] = Path(camels_root[key])
     elif not isinstance(camels_root, Path):
-        raise ValueError(f"camels_root must be Path or str, not {type(camels_root)}")
-    if dataset[0] == "camels_gb":
+        raise ValueError(
+            f"camels_root must be Path or str or list thereof, not {type(camels_root)}"
+        )
+    if "camels_us" in dataset and "camels_gb" in dataset:
+        basin = basin.split("_")
+        if basin[0] == "us":
+            return load_discharge(camels_root["us"], basin[1], area, ["camels_us"])
+        elif basin[0] == "gb":
+            return load_discharge(camels_root["gb"], basin[1], area, ["camels_gb"])
+    elif dataset[0] == "camels_gb":
         discharge_path = (
             camels_root
             / "8344e4f3-d2ea-44f5-8afa-86d2987543a9"
