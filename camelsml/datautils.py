@@ -115,10 +115,10 @@ def add_camels_attributes(
 
         if any(dfgb["frac_forest"] > 1):
             raise ValueError(f"forest_frac invalid, max: {dfgb['forest_frac'].max()}")
-        dfgb["gfv_max"] = 1 - dfgb["urban_perc"].values - dfgb["inwater_perc"].values
-        if any(np.logical_or(0 > dfgb["gfv_max"], dfgb["gfv_max"] > 1)):
+        dfgb["gvf_max"] = 1 - dfgb["urban_perc"].values - dfgb["inwater_perc"].values
+        if any(np.logical_or(0 > dfgb["gvf_max"], dfgb["gvf_max"] > 1)):
             raise ValueError(
-                f"gfv_max invalid. Min: {dfgb['gfv_max'].min()}, max: {dfgb['gfv_max'].max()}"
+                f"gvf_max invalid. Min: {dfgb['gvf_max'].min()}, max: {dfgb['gvf_max'].max()}"
             )
 
         dfus["area"] = dfus["area_gages2"].values
@@ -127,7 +127,8 @@ def add_camels_attributes(
         dfus["sand_perc"] = dfus["sand_frac"].values
         dfus["silt_perc"] = dfus["silt_frac"].values
         dfus["clay_perc"] = dfus["clay_frac"].values
-        dfus["organic_perc"] = dfus["clay_perc"]
+        dfus["organic_perc"] = dfus["organic_frac"].values
+        dfus["pet_mean"] = dfus["p_mean"].values
 
         overlap = []
         for column in dfus.columns:
@@ -233,11 +234,6 @@ def load_attributes(
     # Permutate before dropping other basins
     if permutate_feature is not None:
         df[permutate_feature] = df[permutate_feature].sample(frac=1).to_numpy()
-    # return drop_basins, df
-    # drop lat/lon col
-    # if drop_lat_lon:
-    #    df = df.drop(["gauge_lat", "gauge_lon"], axis=1)
-
     # drop invalid attributes
     if keep_features is not None:
         drop_names = [c for c in df.columns if c not in keep_features]
@@ -250,7 +246,6 @@ def load_attributes(
         for feature in keep_features:
             if feature not in df.columns:
                 undefined_features.append(feature)
-                # raise ValueError(f"Feature {feature} does not exist")
         if len(undefined_features) > 0:
             raise ValueError(
                 f"You have undefined features in your config. List: {undefined_features}"

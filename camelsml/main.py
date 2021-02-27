@@ -263,7 +263,6 @@ def _prepare_data(
             db_path=cfg["db_path"],
             basins=basins,
             keep_features=attribute_selection,
-            dataset=cfg["dataset"],
         )
     except ValueError as e:
         print("Error detected in static feature setup!")
@@ -402,7 +401,7 @@ def train(cfg):
         basins = get_basin_list(cfg["train_basin_file"])
     except KeyError:
         raise KeyError(f"train_basin_file not found in config file")
-    if "attribute_selection_file" in cfg.keys() and False:
+    if "attribute_selection_file" in cfg.keys():
         attribute_selection = np.genfromtxt(
             cfg["attribute_selection_file"], dtype="str"
         )
@@ -622,7 +621,6 @@ def evaluate(
         db_path=db_path,
         basins=basins,
         keep_features=attribute_selection,
-        dataset=user_cfg["dataset"],
     )
     if split == "train":
         means = attributes.mean()
@@ -632,7 +630,6 @@ def evaluate(
             db_path=db_path,
             basins=get_basin_list(user_cfg["train_basin_file"]),
             keep_features=attribute_selection,
-            dataset=user_cfg["dataset"],
         )
         means = attributes_train.mean()
         stds = attributes_train.std()
