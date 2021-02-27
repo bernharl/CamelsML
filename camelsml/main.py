@@ -113,6 +113,7 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
         "timeseries": split_list,
         "camels_gb_root": Path,
         "camels_us_root": Path,
+        "attribute_dataset": str,
     }
     cfg["num_workers"] = num_workers
     cfg["device"] = device
@@ -128,7 +129,8 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
                 line = line.split(": ")
                 key = line[0]
                 value = line[1][:-1]
-            except IndexError:
+            except IndexError as e:
+                print(e)
                 raise IndexError(f"Unable to parse line {line}")
             try:
                 cfg[key] = types[key](value)
@@ -136,7 +138,8 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
                 raise NotImplementedError(
                     f"No functionality for setting {key} implemented"
                 )
-            except ValueError:
+            except ValueError as e:
+                print(e)
                 raise ValueError(f"Error parsing '{line}', '{key}', '{value}'")
     if "evaluate_on_epoch" not in cfg.keys():
         cfg["evaluate_on_epoch"] = False
@@ -171,6 +174,9 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
             ]
         elif "camels_gb" in cfg["dataset"] and "camels_us" in cfg["dataset"]:
             cfg["timeseries"] = ["precipitation", "temperature", "shortwave_rad"]
+
+        else:
+            raise NotImplementedError(f"Dataset {cfg['dataset']} not implemented.")
 
     if "camels_root" in cfg and ("camels_gb_root" in cfg or "camels_us_root" in cfg):
         warnings.warn(
@@ -217,6 +223,10 @@ def _setup_run(cfg: Dict) -> Dict:
         for key, val in cfg.items():
             if isinstance(val, PosixPath):
                 temp_cfg[key] = str(val)
+            elif isinstance(val, Dict):
+                for k in val:
+                    if isinstance(val[k], PosixPath):
+                        val[k] = str(val[k])
             elif isinstance(val, pd.Timestamp):
                 temp_cfg[key] = val.strftime(format="%d%m%Y")
             else:
@@ -391,7 +401,7 @@ def train(cfg):
         basins = get_basin_list(cfg["train_basin_file"])
     except KeyError:
         raise KeyError(f"train_basin_file not found in config file")
-    if "attribute_selection_file" in cfg.keys():
+    if "attribute_selection_file" in cfg.keys() and False:
         attribute_selection = np.genfromtxt(
             cfg["attribute_selection_file"], dtype="str"
         )

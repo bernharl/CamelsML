@@ -102,10 +102,7 @@ class CamelsTXT(Dataset):
         self.period_start = None
         self.period_end = None
         self.attribute_names = None
-        if len(dataset) > 1:
-            raise NotImplementedError("Support for multiple datasets not implemented.")
-        else:
-            self.dataset = dataset
+        self.dataset = dataset
         self.x, self.y = self._load_data()
         if self.with_attributes:
             self.attributes = self._load_attributes()
@@ -147,7 +144,7 @@ class CamelsTXT(Dataset):
         self.period_end = df.index[-1]
         self.dates_index = df.index
         # use all meteorological variables as inputs
-        x = np.array([x_ for x_ in self.timeseries])
+        x = np.array(df[[x_ for x_ in self.timeseries]])
         y = np.array([df["QObs(mm/d)"].values]).T
 
         # normalize data, reshape for LSTM training and remove invalid samples

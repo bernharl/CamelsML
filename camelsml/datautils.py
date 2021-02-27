@@ -100,12 +100,71 @@ def add_camels_attributes(
     RuntimeError
         If CAMELS attributes folder could not be found.
     """
-    if dataset[0] == "camels_gb":
+    if "camels_gb" in dataset and "camels_us" in dataset:
+        dfus = read_attributes(camels_root=camels_root["us"], dataset="camels_us")
+        dfus.set_index("us_" + dfus.index, inplace=True)
+        dfus.columns = dfus.columns.str.lower()
+        dfgb = read_attributes(camels_root=camels_root["gb"], dataset="camels_gb")
+        dfgb.set_index("gb_" + dfgb.index, inplace=True)
+        dfgb.columns = dfgb.columns.str.lower()
+
+        for column in dfgb.columns:
+            if "_perc" in column:
+                dfgb[column] = dfgb[column] / 100
+        dfgb["frac_forest"] = dfgb["dwood_perc"].values + dfgb["ewood_perc"].values
+
+        if any(dfgb["frac_forest"] > 1):
+            raise ValueError(f"forest_frac invalid, max: {dfgb['forest_frac'].max()}")
+        dfgb["gfv_max"] = 1 - dfgb["urban_perc"].values - dfgb["inwater_perc"].values
+        if any(np.logical_or(0 > dfgb["gfv_max"], dfgb["gfv_max"] > 1)):
+            raise ValueError(
+                f"gfv_max invalid. Min: {dfgb['gfv_max'].min()}, max: {dfgb['gfv_max'].max()}"
+            )
+
+        dfus["area"] = dfus["area_gages2"].values
+        dfus["porosity_cosby"] = dfus["soil_porosity"].values
+        dfus["conductivity_cosby"] = dfus["soil_conductivity"].values
+        dfus["sand_perc"] = dfus["sand_frac"].values
+        dfus["silt_perc"] = dfus["silt_frac"].values
+        dfus["clay_perc"] = dfus["clay_frac"].values
+        dfus["organic_perc"] = dfus["clay_perc"]
+
+        overlap = []
+        for column in dfus.columns:
+            if column in dfgb.columns:
+                overlap.append(column)
+        df = pd.merge(
+            dfgb[overlap],
+            dfus[overlap],
+            how="outer",
+            left_index=True,
+            right_index=True,
+            on=overlap,
+        )
+
+    elif dataset[0] == "camels_gb" or dataset[0] == "camels_us":
+        df = read_attributes(camels_root=camels_root, dataset=dataset[0])
+    else:
+        raise NotImplementedError(f"Dataset {dataset} not implemented.")
+    if db_path is None:
+        db_path = str(
+            Path(__file__).absolute().parent.parent / "data" / "attributes.db"
+        )
+
+    with sqlite3.connect(db_path) as conn:
+        # insert into database
+        df.to_sql("basin_attributes", conn)
+
+    print(f"Successfully stored basin attributes in {db_path}.")
+
+
+def read_attributes(camels_root: Path, dataset: str) -> pd.DataFrame:
+    if dataset == "camels_gb":
         filename = "CAMELS_GB_*.csv"
         attributes_path = (
             Path(camels_root) / "8344e4f3-d2ea-44f5-8afa-86d2987543a9" / "data"
         )
-    elif dataset[0] == "camels_us":
+    elif dataset == "camels_us":
         filename = "camels_*.txt"
         attributes_path = (
             Path(camels_root) / "basin_dataset_public_v1p2" / "camels_attributes_v2.0"
@@ -121,34 +180,24 @@ def add_camels_attributes(
     # Read-in attributes into one big dataframe
     df = None
     for f in txt_files:
-        if dataset[0] == "camels_gb":
+        if dataset == "camels_gb":
             df_temp = pd.read_csv(f)
-        elif dataset[0] == "camels_us":
+        elif dataset == "camels_us":
             df_temp = pd.read_csv(f, sep=";", header=0, dtype={"gauge_id": str})
             df_temp = df_temp.set_index("gauge_id")
         if df is None:
             df = df_temp.copy()
         else:
             df = pd.concat([df, df_temp], axis=1)
-    if dataset[0] == "camels_us":
+    if dataset == "camels_us":
         df["huc"] = df["huc_02"].apply(lambda x: str(x).zfill(2))
         df = df.drop("huc_02", axis=1)
     df = df.loc[:, ~df.columns.duplicated()]
     df = df.select_dtypes(exclude=["object"])
-    if dataset[0] == "camels_gb":
+    if dataset == "camels_gb":
         df.set_index("gauge_id", inplace=True)
         df.index = df.index.astype("str")
-    if db_path is None:
-        db_path = str(
-            Path(__file__).absolute().parent.parent / "data" / "attributes.db"
-        )
-
-    with sqlite3.connect(db_path) as conn:
-        # insert into database
-        df.to_sql("basin_attributes", conn)
-
-    print(f"Successfully stored basin attributes in {db_path}.")
-    raise JeffError
+    return df
 
 
 def load_attributes(
@@ -210,7 +259,7 @@ def load_attributes(
     df = df.dropna(axis=1)
     columns_after = df.columns
     for feature in columns:
-        if feature not in columns_after:
+        if feature not in columns_after and feature not in drop_names:
             warnings.warn(f"Dropped {feature} because of NaN!")
     df = df.drop(drop_basins, axis=0)
     return df
