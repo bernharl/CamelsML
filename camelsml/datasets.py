@@ -329,7 +329,6 @@ class CamelsH5(Dataset):
 
         # self.attribute_names = df.columns
         self.df = df
-        # print(self.df)
 
     def get_attribute_means(self) -> pd.Series:
         """Return means of catchment attributes

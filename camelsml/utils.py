@@ -104,7 +104,7 @@ def create_h5_files(
                 "sample_2_basin",
                 shape=(0,),
                 maxshape=(None,),
-                dtype="S10",
+                dtype="S11",
                 compression="gzip",
                 chunks=True,
             )
