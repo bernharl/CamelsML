@@ -767,6 +767,7 @@ def _store_results(user_cfg: Dict, run_cfg: Dict, results: pd.DataFrame, epoch: 
     """
     if "eval_dir" in user_cfg:
         store_dir = user_cfg["eval_dir"]
+        sotre_dir.mkdir(exist_ok=True, parents=True)
         raise KekError
     else:
         store_dir = user_cfg["run_dir"]
