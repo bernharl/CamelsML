@@ -105,6 +105,7 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
         "early_stopping": bool_type,
         "early_stopping_steps": int,
         "dataset": split_list,
+        "eval_dir": Path,
     }
     cfg["num_workers"] = num_workers
     cfg["device"] = device
@@ -764,20 +765,20 @@ def _store_results(user_cfg: Dict, run_cfg: Dict, results: pd.DataFrame, epoch: 
         DataFrame containing the observed and predicted discharge.
 
     """
+    if "eval_dir" in user_cfg:
+        store_dir = user_cfg["eval_dir"]
+        raise KekError
+    else:
+        store_dir = user_cfg["run_dir"]
+        raise CringeError
+
     if run_cfg["no_static"]:
-        file_name = (
-            user_cfg["run_dir"]
-            / f"lstm_no_static_seed{run_cfg['seed']}_epoch_{epoch}.p"
-        )
+        file_name = store_dir / f"lstm_no_static_seed{run_cfg['seed']}_epoch_{epoch}.p"
     else:
         if run_cfg["concat_static"]:
-            file_name = (
-                user_cfg["run_dir"] / f"lstm_seed{run_cfg['seed']}_epoch_{epoch}.p"
-            )
+            file_name = store_dir / f"lstm_seed{run_cfg['seed']}_epoch_{epoch}.p"
         else:
-            file_name = (
-                user_cfg["run_dir"] / f"ealstm_seed{run_cfg['seed']}_epoch_{epoch}.p"
-            )
+            file_name = store_dir / f"ealstm_seed{run_cfg['seed']}_epoch_{epoch}.p"
 
     with (file_name).open("wb") as fp:
         pickle.dump(results, fp)
