@@ -817,11 +817,9 @@ def _store_results(user_cfg: Dict, run_cfg: Dict, results: pd.DataFrame, epoch: 
     """
     if "eval_dir" in user_cfg:
         store_dir = user_cfg["eval_dir"]
-        sotre_dir.mkdir(exist_ok=True, parents=True)
-        raise KekError
+        store_dir.mkdir(exist_ok=True, parents=True)
     else:
         store_dir = user_cfg["run_dir"]
-        raise CringeError
 
     if run_cfg["no_static"]:
         file_name = store_dir / f"lstm_no_static_seed{run_cfg['seed']}_epoch_{epoch}.p"
