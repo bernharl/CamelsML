@@ -122,12 +122,12 @@ def add_camels_attributes(
             )
 
         dfus["area"] = dfus["area_gages2"].values
-        dfus["porosity_cosby"] = dfus["soil_porosity"].values
+        dfus["porosity_cosby"] = dfus["soil_porosity"].values * 100
         dfus["conductivity_cosby"] = dfus["soil_conductivity"].values
-        dfus["sand_perc"] = dfus["sand_frac"].values
-        dfus["silt_perc"] = dfus["silt_frac"].values
-        dfus["clay_perc"] = dfus["clay_frac"].values
-        dfus["organic_perc"] = dfus["organic_frac"].values
+        dfus["sand_perc"] = dfus["sand_frac"].values / 100
+        dfus["silt_perc"] = dfus["silt_frac"].values / 100
+        dfus["clay_perc"] = dfus["clay_frac"].values / 100
+        dfus["organic_perc"] = dfus["organic_frac"].values / 100
         dfus["pet_mean"] = dfus["p_mean"].values
 
         overlap = []
