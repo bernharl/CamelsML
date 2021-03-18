@@ -255,7 +255,7 @@ def load_attributes(
     columns_after = df.columns
     for feature in columns:
         if feature not in columns_after and feature not in drop_names:
-            warnings.warn(f"Dropped {feature} because of NaN!")
+            tqdm.write(f"Dropped {feature} because of NaN!")
     df = df.drop(drop_basins, axis=0)
     return df
 
