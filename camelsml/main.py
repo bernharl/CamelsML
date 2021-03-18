@@ -403,6 +403,10 @@ def train(cfg):
     except KeyError:
         raise KeyError(f"train_basin_file not found in config file")
     if "attribute_selection_file" in cfg.keys():
+        if cfg["no_static"]:
+            warnings.warn(
+                "You have set model to ignore attributes, but still specified attributes."
+            )
         attribute_selection = np.genfromtxt(
             cfg["attribute_selection_file"], dtype="str"
         )
