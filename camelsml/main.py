@@ -68,7 +68,7 @@ def load_config(cfg_file: Union[Path, str], device="cuda:0", num_workers=1) -> D
         elif var in (0, 1):
             return bool(var)
         else:
-            raise TypeError("A variable could not be converted to bool, check config")
+            raise TypeError(f"A variable ({var}) could not be converted to bool, check config")
 
     def split_list(var):
         var = var.split(",")
