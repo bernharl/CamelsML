@@ -18,7 +18,6 @@ import torch.nn as nn
 class LSTM(nn.Module):
     """Implementation of the standard LSTM.
 
-    TODO: Include ref and LaTeX equations
 
     Parameters
     ----------
