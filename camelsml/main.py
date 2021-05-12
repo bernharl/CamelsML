@@ -587,7 +587,6 @@ def evaluate(
     user_cfg: Dict,
     split: str = "test",
     epoch: Optional[int] = None,
-    save_dir: Optional[Path] = None,
     store: bool = True,
     permutate_feature: str = None,
 ) -> Dict:
