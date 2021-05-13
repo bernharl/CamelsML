@@ -37,16 +37,17 @@ def split_basins(
     store_folder.mkdir(parents=True, exist_ok=True)
     basins = np.loadtxt(basin_list, dtype="str")
     np.random.shuffle(basins)
-    basins_train = basins[: int(len(basins) * split[0])]
     if len(split) == 2:
-        basins_test = basins[int(len(basins) * split[0]) :]
+        basins_test = basins[: int(len(basins) * split[1])]
+        basins_train = basins[int(len(basins) * split[1]) :]
     else:
+        basins_test = basins[: int(len(basins) * split[2])]
         basins_validation = basins[
-            int(len(basins) * split[0]) : int(len(basins) * split[0])
-            + int(len(basins) * split[1])
+            int(len(basins) * split[2])
+            : int(len(basins) * split[1]) + int(len(basins) * split[2])
         ]
-        basins_test = basins[
-            int(len(basins) * split[0]) + int(len(basins) * split[1]) :
+        basins_train = basins[
+            int(len(basins) * split[1]) + int(len(basins) * split[2]) :
         ]
     np.savetxt(store_folder / "basins_test.txt", basins_test, fmt="%s")
     np.savetxt(store_folder / "basins_train.txt", basins_train, fmt="%s")
