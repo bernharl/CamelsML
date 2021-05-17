@@ -206,6 +206,7 @@ def load_attributes(
     basins: List[str],
     keep_features: List = None,
     permutate_feature: str = None,
+    drop_nans: bool = True,
 ) -> pd.DataFrame:
     """Load attributes from database file into DataFrame
 
@@ -251,7 +252,8 @@ def load_attributes(
                 f"You have undefined features in your config. List: {undefined_features}"
             )
     columns = df.columns
-    df = df.dropna(axis=1)
+    if drop_nans:
+        df = df.dropna(axis=1)
     columns_after = df.columns
     for feature in columns:
         if feature not in columns_after and feature not in drop_names:
