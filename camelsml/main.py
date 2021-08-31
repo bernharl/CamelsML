@@ -292,7 +292,7 @@ def _prepare_data(
 
 
 class Model(nn.Module):
-    """Wrapper class that connects LSTM/EA-LSTM with fully connceted layer"""
+    """Wrapper class that connects LSTM/EA-LSTM with fully connected layer"""
 
     def __init__(
         self,
