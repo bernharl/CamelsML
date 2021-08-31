@@ -8,6 +8,8 @@ pipenv install -e git+https://github.com/bernharl/ealstm_regional_modeling_camel
 ```
 - If not using pipenv, this repository should be installable using pip as well.
 
+- The package is also available on PyPi under the name camelsml
+
 ## Content of the repository
 This repo is structured like a Python package. All relevant code is found within the `camelsml` directory.
 
