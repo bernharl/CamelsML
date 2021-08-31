@@ -6,11 +6,10 @@
 ```
 pipenv install -e git+https://github.com/bernharl/ealstm_regional_modeling_camels_gb.git#egg=camelsml --python 3.8
 ```
-- If only using pipenv, make sure to manually fix the Python version. Pytorch doesn't support Python >= 3.9 as of December 4th 2020.
 - If not using pipenv, this repository should be installable using pip as well.
 
 ## Content of the repository
-- will add later
+This repo is structured like a Python package. All relevant code is found within the `camelsml` directory.
 
 
 ## Citation
@@ -32,8 +31,7 @@ url = {https://www.hydrol-earth-syst-sci.net/23/5089/2019/},
 doi = {10.5194/hess-23-5089-2019}
 }
 ```
+, as well as the thesis connected to this code.
 
-## License of our code
+## License
 [Apache License 2.0](https://github.com/kratzert/ealstm_regional_modeling/blob/master/LICENSE)
-
-## License of the CAMELS GB dataset and pre-trained models.
